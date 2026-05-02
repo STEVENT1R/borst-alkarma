@@ -12,6 +12,7 @@ if (process.env.DATABASE_URL) {
     },
   });
 } else {
+
   // Development mode (local PostgreSQL)
   pool = new Pool({
     user: process.env.DB_USER,

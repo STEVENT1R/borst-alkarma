@@ -8,10 +8,10 @@ services:
       - key: PORT
         value: "10000"
       - key: DATABASE_URL
-        sync: false
+        value: "postgresql://postgres:steven01272944685@db.zqdsvesmmmatjtbldhov.supabase.co:5432/postgres"
       - key: JWT_SECRET
-        sync: false
+        value: "borst_alkarma_secret_key_2024"
       - key: VAPID_PUBLIC_KEY
-        sync: false
+        value: "BEJZ0VW5Fc3NsMPSUUjQFYohT-5HlpDNq93SC3M5Ubwx1tY5Jcdwx5NcShegINlz7WHbc-jvzLrR1c1ng-UxBM4"
       - key: VAPID_PRIVATE_KEY
-        sync: false
+        value: "sftnDOP6dZJvLd8vjb86wY0DDDAUrd96wVNmGwkNQrE"
