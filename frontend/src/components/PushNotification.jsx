@@ -6,11 +6,11 @@ const PushNotification = () => {
   const [isSupported, setIsSupported] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [permission, setPermission] = useState(Notification.permission);
+  const [permission, setPermission] = useState(typeof Notification !== 'undefined' ? Notification.permission : 'default');
 
   useEffect(() => {
-    // هل المتصفح يدعم Service Worker و Push?
-    if ('serviceWorker' in navigator && 'PushManager' in window) {
+    // هل المتصفح يدعم Service Worker و Push؟
+    if (typeof Notification !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window) {
       setIsSupported(true);
       checkSubscription();
     }
@@ -52,10 +52,9 @@ const PushNotification = () => {
       const keyRes = await api.get('/push/vapid-key');
       const vapidPublicKey = keyRes.data.publicKey;
 
-      // 3. تسجيل الـ Service Worker
-      const registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
-      // استنى لما يخلص تسجيل
-      await navigator.serviceWorker.ready;
+      // 3. استنى لما الـ Service Worker يخلص تسجيل (مسجل بالفعل من main.jsx)
+      const registration = await navigator.serviceWorker.ready;
+
 
       // 4. الاشتراك في الـ Push
       const subscription = await registration.pushManager.subscribe({
