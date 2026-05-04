@@ -41,7 +41,7 @@ const CashFlowLog = () => {
 
   const formatCurrency = (val) => {
     const n = parseFloat(val) || 0;
-    return n.toFixed(2);
+    return n.toFixed(1);
   };
 
   // Group transactions by day
@@ -125,7 +125,7 @@ const CashFlowLog = () => {
                 <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
                 <XAxis dataKey="date" tick={{ fontSize: 10 }} tickFormatter={(v) => v?.slice(5) || ''} />
                 <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip formatter={(value) => `${parseFloat(value).toFixed(2)} ج.م`} />
+                <Tooltip formatter={(value) => `${parseFloat(value).toFixed(1)} ج.م`} />
                 <Area type="monotone" dataKey="income" stroke="#22c55e" fill="#22c55e20" name="دخل" />
                 <Area type="monotone" dataKey="expenses" stroke="#ef4444" fill="#ef444420" name="مصروفات" />
                 <Line type="monotone" dataKey="net" stroke="#0ea5e9" strokeWidth={2} name="صافي" dot={false} />

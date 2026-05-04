@@ -3,6 +3,7 @@ import CashierDashboard from './CashierDashboard';
 import CashierSales from './CashierSales';
 import CashierInventory from './CashierInventory';
 import CashierLogs from './CashierLogs';
+import CashierSettings from './CashierSettings';
 import Notifications from '../common/Notifications';
 import BottomNav from '../../components/BottomNav';
 import TopBar from '../../components/TopBar';
@@ -18,6 +19,7 @@ const CashierLayout = () => (
           <Route path="inventory" element={<CashierInventory />} />
           <Route path="logs" element={<CashierLogs />} />
           <Route path="notifications" element={<Notifications />} />
+          <Route path="settings" element={<CashierSettings />} />
         </Routes>
       </div>
     </div>

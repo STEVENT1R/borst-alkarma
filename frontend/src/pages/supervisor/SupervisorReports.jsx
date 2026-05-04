@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { FileText, Package, Users, DollarSign, TrendingUp, BarChart3, Wallet, ShoppingCart, Store } from 'lucide-react';
+import { FileText, Package, Users, DollarSign, TrendingUp, BarChart3, Wallet, ShoppingCart, Store, CreditCard } from 'lucide-react';
 
 const SupervisorReports = () => (
   <div>
@@ -17,8 +17,12 @@ const SupervisorReports = () => (
         <div className="bg-blue-100 p-3 rounded-xl"><Users className="text-blue-600" size={24} /></div>
         <span className="font-bold text-gray-800">سجل التعاملات</span>
       </Link>
+      <Link to="/supervisor/salary-log" className="flex items-center gap-4 bg-white p-5 rounded-2xl shadow-sm border hover:border-red-300 transition-colors">
+        <div className="bg-red-800 p-3 rounded-xl"><CreditCard className="text-white" size={24} /></div>
+        <span className="font-bold text-gray-800">سجل الرواتب</span>
+      </Link>
       <Link to="/supervisor/profit-log" className="flex items-center gap-4 bg-white p-5 rounded-2xl shadow-sm border hover:border-yellow-300 transition-colors">
-        <div className="bg-yellow-100 p-3 rounded-xl"><DollarSign className="text-yellow-600" size={24} /></div>
+        <div className="bg-green-800 p-3 rounded-xl"><DollarSign className="text-white" size={24} /></div>
         <span className="font-bold text-gray-800">سجل الربح والمصروفات</span>
       </Link>
       <Link to="/supervisor/cashflow-log" className="flex items-center gap-4 bg-white p-5 rounded-2xl shadow-sm border hover:border-teal-300 transition-colors">
@@ -35,8 +39,9 @@ const SupervisorReports = () => (
       </Link>
       <Link to="/supervisor/performance-log" className="flex items-center gap-4 bg-white p-5 rounded-2xl shadow-sm border hover:border-purple-300 transition-colors">
         <div className="bg-purple-100 p-3 rounded-xl"><BarChart3 className="text-purple-600" size={24} /></div>
-        <span className="font-bold text-gray-800">سجل الأداء</span>
+        <span className="font-bold text-gray-800">الجرد</span>
       </Link>
+
     </div>
   </div>
 );

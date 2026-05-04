@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
-import { Send, User, Package, DollarSign, Clock, Users, ShoppingBag, Store } from 'lucide-react';
+import { Send, User, Package, DollarSign, Clock, Users, TrendingUp } from 'lucide-react';
 
 const CreateTask = () => {
   const { user } = useAuth();
@@ -15,13 +15,26 @@ const CreateTask = () => {
     product_name: '',
     quantity: '',
     unit_type: 'unit',
-    price: '',
+    unit_selling_price: '', // سعر بيع الوحدة (يدوي)
     reminder_time: '',
-    sale_type: 'retail',
     notes: '',
   });
   const [message, setMessage] = useState({ type: '', text: '' });
   const [loading, setLoading] = useState(false);
+
+  // إحضار سعر الشراء للمنتج المختار
+  const selectedProduct = products.find(p => p.product_name === form.product_name) || null;
+  const purchasePrice = selectedProduct ? parseFloat(selectedProduct.purchase_price || 0) : 0;
+  const quantity = parseFloat(form.quantity) || 0;
+  const unitSellingPrice = parseFloat(form.unit_selling_price) || 0;
+
+  // حساب الإجمالي والربح
+  const totalSelling = quantity * unitSellingPrice;
+  const totalCost = quantity * purchasePrice;
+  const profit = totalSelling - totalCost;
+
+  // دالة لعرض الأرقام: للعدد → صحيح، للوزن → رقم عشري واحد
+  const fmt = (num) => form.unit_type === 'weight' ? num.toFixed(1) : Math.floor(num) === num ? num.toString() : num.toFixed(1);
 
   useEffect(() => {
     api.get('/users/workers').then(res => setWorkers(res.data)).catch(() => {});
@@ -43,13 +56,16 @@ const CreateTask = () => {
         product_name: form.product_name || null,
         quantity: form.quantity ? parseFloat(form.quantity) : 0,
         unit_type: form.unit_type,
-        price: form.price ? parseFloat(form.price) : 0,
+        price: totalSelling, // السعر الإجمالي اللي هيتحط في المهمة
         reminder_time: form.reminder_time || null,
-        sale_type: form.sale_type,
         notes: form.notes || null,
       });
       setMessage({ type: 'success', text: 'تم إنشاء المهمة بنجاح' });
-      setForm({ worker_id: '', title: '', receiver_name: '', product_name: '', quantity: '', unit_type: 'unit', price: '', reminder_time: '', sale_type: 'retail', notes: '' });
+      setForm({
+        worker_id: '', title: '', receiver_name: '', product_name: '',
+        quantity: '', unit_type: 'unit', unit_selling_price: '',
+        reminder_time: '', notes: ''
+      });
     } catch (err) {
       setMessage({ type: 'error', text: err.response?.data?.error || 'فشل' });
     } finally { setLoading(false); }
@@ -124,7 +140,6 @@ const CreateTask = () => {
                             ...form,
                             product_name: p.product_name,
                             unit_type: p.unit_type || 'unit',
-                            sale_type: form.sale_type
                           });
                         }}
                         className={`text-right p-2 rounded-lg border text-xs transition-all ${
@@ -135,8 +150,8 @@ const CreateTask = () => {
                       >
                         <div className="font-bold">{p.product_name}</div>
                         <div className="text-gray-500">
-                          {p.quantity} {p.unit_type === 'weight' ? 'كجم' : 'قطعة'} 
-                          {p.retail_price && ` | قطاعي: ${p.retail_price} ج`}
+                          {p.quantity} {p.unit_type === 'weight' ? 'كجم' : 'قطعة'}
+                          <div className="text-yellow-800">شراء: {p.purchase_price || 0} ج للوحدة</div>
                         </div>
                       </button>
                     ))}
@@ -147,37 +162,8 @@ const CreateTask = () => {
           </div>
         </div>
 
-        {/* نوع البيع */}
-        <div>
-          <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1"><ShoppingBag size={16} /> نوع البيع</label>
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={() => setForm({...form, sale_type: 'retail'})}
-              className={`flex-1 py-3 rounded-xl font-bold border-2 transition-all flex items-center justify-center gap-1 ${
-                form.sale_type === 'retail'
-                  ? 'bg-green-600 text-white border-green-600'
-                  : 'bg-gray-50 text-gray-600 border-gray-200'
-              }`}
-            >
-              <Store size={16} /> قطاعي
-            </button>
-            <button
-              type="button"
-              onClick={() => setForm({...form, sale_type: 'wholesale'})}
-              className={`flex-1 py-3 rounded-xl font-bold border-2 transition-all flex items-center justify-center gap-1 ${
-                form.sale_type === 'wholesale'
-                  ? 'bg-blue-600 text-white border-blue-600'
-                  : 'bg-gray-50 text-gray-600 border-gray-200'
-              }`}
-            >
-              <Package size={16} /> جملة
-            </button>
-          </div>
-        </div>
-
-        {/* الكمية والنوع والسعر */}
-        <div className="grid grid-cols-3 gap-3">
+        {/* الكمية والنوع وسعر البيع */}
+        <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="text-sm font-medium text-gray-700 mb-1 block">النوع</label>
             <select value={form.unit_type} onChange={e => setForm({...form, unit_type: e.target.value})} className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50">
@@ -189,10 +175,12 @@ const CreateTask = () => {
             <label className="text-sm font-medium text-gray-700 mb-1 block">{form.unit_type === 'weight' ? 'الوزن (كجم)' : 'الكمية'}</label>
             <input type="number" step={form.unit_type === 'weight' ? '0.001' : '1'} value={form.quantity} onChange={e => setForm({...form, quantity: e.target.value})} className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50" />
           </div>
-          <div>
-            <label className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-1"><DollarSign size={14} /> السعر</label>
-            <input type="number" step="0.01" value={form.price} onChange={e => setForm({...form, price: e.target.value})} className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50" />
-          </div>
+        </div>
+
+        {/* سعر بيع الوحدة */}
+        <div>
+          <label className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-1"><DollarSign size={14} /> سعر بيع الوحدة</label>
+          <input type="number" step="0.01" value={form.unit_selling_price} onChange={e => setForm({...form, unit_selling_price: e.target.value})} className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50" placeholder="مثال: 105" />
         </div>
 
         {/* أزرار سريعة للوزن (تظهر فقط عند اختيار وزن) */}
@@ -225,6 +213,38 @@ const CreateTask = () => {
                   {opt.label}
                 </button>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* ملخص الحساب - يظهر لما يكون فيه منتج وكمية وسعر */}
+        {selectedProduct && quantity > 0 && unitSellingPrice > 0 && (
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-xl border border-blue-100 space-y-2">
+            <div className="flex items-center gap-2 text-sm font-bold text-blue-800 mb-2">
+              <TrendingUp size={18} /> ملخص المهمة
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">سعر شراء الوحدة:</span>
+              <span className="font-bold text-gray-800">{fmt(purchasePrice)} ج.م</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">سعر بيع الوحدة:</span>
+              <span className="font-bold text-green-700">{fmt(unitSellingPrice)} ج.م</span>
+            </div>
+            <div className="border-t border-blue-200 my-1" />
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500">استهلاك المخزن:</span>
+              <span className="font-bold text-orange-500">{fmt(totalCost)} ج.م</span>
+            </div>
+            <div className="flex justify-between text-base">
+              <span className="font-bold text-gray-700">الربح المتوقع:</span>
+              <span className={`font-extrabold text-lg ${profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {fmt(profit)} ج.م
+              </span>
+            </div>
+            <div className="flex justify-between text-base">
+              <span className="text-gray-600 font-bold">الإجمالي المباع:</span>
+              <span className="font-extrabold text-lg text-gray-800">{fmt(totalSelling)} ج.م</span>
             </div>
           </div>
         )}

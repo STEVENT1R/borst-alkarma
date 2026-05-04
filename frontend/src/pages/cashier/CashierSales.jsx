@@ -33,7 +33,7 @@ const CashierSales = () => {
   const handleSelectProduct = (product) => {
     setSelectedProduct(product);
     setQuantity('1');
-    setSalePrice(product.retail_price ? product.retail_price.toString() : (parseFloat(product.purchase_price) * 1.2).toFixed(2));
+    setSalePrice(product.retail_price ? product.retail_price.toString() : (parseFloat(product.purchase_price) * 1.2).toFixed(1));
     setMessage({ type: '', text: '' });
     setShowProductList(false);
   };
@@ -58,7 +58,7 @@ const CashierSales = () => {
       .reduce((sum, item) => sum + item.quantity, 0);
     
     if (totalQtyInCart + qty > parseFloat(selectedProduct.quantity)) {
-      return setMessage({ type: 'error', text: `المخزون غير كافٍ. المتوفر: ${parseFloat(selectedProduct.quantity).toFixed(2)} ${selectedProduct.unit_type === 'weight' ? 'كجم' : 'قطعة'}` });
+      return setMessage({ type: 'error', text: `المخزون غير كافٍ. المتوفر: ${parseFloat(selectedProduct.quantity).toFixed(1)} ${selectedProduct.unit_type === 'weight' ? 'كجم' : 'قطعة'}` });
     }
 
     setCart(prev => [...prev, {
@@ -74,7 +74,7 @@ const CashierSales = () => {
     
     // Reset selection but stay on the product form
     setQuantity('1');
-    setSalePrice(selectedProduct.retail_price ? selectedProduct.retail_price.toString() : (parseFloat(selectedProduct.purchase_price) * 1.2).toFixed(2));
+    setSalePrice(selectedProduct.retail_price ? selectedProduct.retail_price.toString() : (parseFloat(selectedProduct.purchase_price) * 1.2).toFixed(1));
   };
 
   const handleRemoveFromCart = (itemId) => {
@@ -100,7 +100,7 @@ const CashierSales = () => {
 
       setMessage({
         type: 'success',
-        text: `تمت عملية البيع بنجاح! إجمالي المبلغ: ${cartTotal.toFixed(2)} ج`
+        text: `تمت عملية البيع بنجاح! إجمالي المبلغ: ${cartTotal.toFixed(1)} ج`
       });
 
       setCart([]);
@@ -146,7 +146,7 @@ const CashierSales = () => {
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-500">{cart.length} منتج</span>
-            <span className="text-lg font-bold text-green-700">{cartTotal.toFixed(2)} ج</span>
+            <span className="text-lg font-bold text-green-700">{cartTotal.toFixed(1)} ج</span>
           </div>
         </div>
       </div>
@@ -170,7 +170,7 @@ const CashierSales = () => {
             </button>
           </div>
           <div className="text-sm text-gray-500 mb-3">
-            <span>المخزون الحالي: {parseFloat(selectedProduct.quantity).toFixed(2)} {selectedProduct.unit_type === 'weight' ? 'كجم' : 'قطعة'}</span>
+            <span>المخزون الحالي: {parseFloat(selectedProduct.quantity).toFixed(1)} {selectedProduct.unit_type === 'weight' ? 'كجم' : 'قطعة'}</span>
           </div>
 
           <form onSubmit={handleAddToCart} className="space-y-3">
@@ -263,10 +263,10 @@ const CashierSales = () => {
                     <div>
                       <div className="font-bold text-gray-800">{product.product_name}</div>
                       <div className="text-xs text-gray-400">
-                        المخزون: {remaining.toFixed(2)} {product.unit_type === 'weight' ? 'كجم' : 'قطعة'}
-                        {inCartQty > 0 && <span className="mr-2 text-blue-600">({inCartQty.toFixed(2)} في الفاتورة)</span>}
+                        المخزون: {remaining.toFixed(1)} {product.unit_type === 'weight' ? 'كجم' : 'قطعة'}
+                        {inCartQty > 0 && <span className="mr-2 text-blue-600">({inCartQty.toFixed(1)} في الفاتورة)</span>}
                         {product.retail_price && parseFloat(product.retail_price) > 0 && (
-                          <span className="mr-2">• سعر التجزئة: {parseFloat(product.retail_price).toFixed(2)} ج</span>
+                          <span className="mr-2">• سعر التجزئة: {parseFloat(product.retail_price).toFixed(1)} ج</span>
                         )}
                       </div>
                     </div>
@@ -287,7 +287,7 @@ const CashierSales = () => {
           <div className="p-3 bg-gradient-to-l from-green-50 to-white border-b">
             <div className="flex items-center justify-between">
               <span className="font-bold text-green-700">محتوى الفاتورة ({cart.length})</span>
-              <span className="font-bold text-green-700">{cartTotal.toFixed(2)} ج</span>
+              <span className="font-bold text-green-700">{cartTotal.toFixed(1)} ج</span>
             </div>
           </div>
           <div className="divide-y divide-gray-100">
@@ -296,11 +296,11 @@ const CashierSales = () => {
                 <div className="flex-1">
                   <div className="font-bold text-sm">{item.product_name}</div>
                   <div className="text-xs text-gray-400">
-                    {item.quantity} {item.unit_type === 'weight' ? 'كجم' : 'قطعة'} × {item.sale_price.toFixed(2)} ج
+                    {item.quantity} {item.unit_type === 'weight' ? 'كجم' : 'قطعة'} × {item.sale_price.toFixed(1)} ج
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="font-bold text-green-600 text-sm">{item.total.toFixed(2)} ج</span>
+                  <span className="font-bold text-green-600 text-sm">{item.total.toFixed(1)} ج</span>
                   <button
                     onClick={() => handleRemoveFromCart(item.id)}
                     className="w-7 h-7 bg-red-50 rounded-full flex items-center justify-center hover:bg-red-100"
@@ -319,7 +319,7 @@ const CashierSales = () => {
             >
               {loading ? 'جاري إتمام البيع...' : (
                 <>
-                  <CheckCircle size={18} /> تأكيد البيع - {cartTotal.toFixed(2)} ج
+                  <CheckCircle size={18} /> تأكيد البيع - {cartTotal.toFixed(1)} ج
                 </>
               )}
             </button>

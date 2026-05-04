@@ -50,7 +50,7 @@ const CashierDashboard = () => {
             <span className="text-sm font-bold opacity-90">مبيعات اليوم</span>
           </div>
           <div className="text-2xl font-extrabold">
-            {loading ? '...' : `${todayStats.total_sales.toFixed(2)} ج`}
+            {loading ? '...' : `${todayStats.total_sales.toFixed(1)} ج`}
           </div>
           <div className="text-xs opacity-75 mt-1">
             {todayStats.total_count} عملية بيع
@@ -63,7 +63,7 @@ const CashierDashboard = () => {
             <span className="text-sm font-bold opacity-90">صافي الربح</span>
           </div>
           <div className="text-2xl font-extrabold">
-            {loading ? '...' : `${todayStats.total_profit.toFixed(2)} ج`}
+            {loading ? '...' : `${todayStats.total_profit.toFixed(1)} ج`}
           </div>
           <div className="text-xs opacity-75 mt-1">
             أرباح اليوم
@@ -90,7 +90,7 @@ const CashierDashboard = () => {
           </div>
           <div className="text-2xl font-extrabold">
             {loading ? '...' : todayStats.total_count > 0 
-              ? `${(todayStats.total_sales / todayStats.total_count).toFixed(2)} ج`
+              ? `${(todayStats.total_sales / todayStats.total_count).toFixed(1)} ج`
               : '0.00 ج'}
           </div>
           <div className="text-xs opacity-75 mt-1">
@@ -160,8 +160,8 @@ const RecentSales = () => {
             </span>
           </div>
           <div className="text-right">
-            <div className="font-bold text-green-600">{toNum(sale.total_amount).toFixed(2)} ج</div>
-            <div className="text-xs text-gray-400">ربح: {toNum(sale.profit_amount).toFixed(2)} ج</div>
+            <div className="font-bold text-green-600">{toNum(sale.total_amount).toFixed(1)} ج</div>
+            <div className="text-xs text-gray-400">ربح: {toNum(sale.profit_amount).toFixed(1)} ج</div>
           </div>
         </div>
       ))}

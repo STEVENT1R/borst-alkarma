@@ -280,7 +280,7 @@ const ReceiversLog = () => {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">نوع المعاملة</label>
                   <select value={newTransaction.type} onChange={e => setNewTransaction({...newTransaction, type: e.target.value})} className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50">
-                    <option value="debt_added">➕ تحميل بضاعة/استلاف (المستلم مديون لنا)</option>
+                    <option value="debt_added">➕ تحميل بضاعة (المستلم مديون لنا)</option>
                     <option value="money_collected">➖ استلام اموال (خصم من مديونيته)</option>
                     <option value="manual_addition">➕ إضافة رصيد يدوي (لينا)</option>
                     <option value="manual_deduction">➖ خصم رصيد يدوي (علينا)</option>

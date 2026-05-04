@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../../services/api';
-import { DollarSign, TrendingUp, TrendingDown, Plus, Trash2, AlertTriangle, ShoppingCart, Users, ArrowLeft, RefreshCw } from 'lucide-react';
+import { DollarSign, TrendingUp, TrendingDown, Plus, Trash2, AlertTriangle, ShoppingCart, Users, ArrowLeft, RefreshCw, Calendar, ChevronDown, ChevronLeft } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { useNavigate } from 'react-router-dom';
 
@@ -13,6 +13,11 @@ const ProfitLog = () => {
   const [error, setError] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ entry_type: 'expense', amount: '', description: '' });
+  const [expandedDays, setExpandedDays] = useState({});
+
+  const toggleDay = (day) => {
+    setExpandedDays(prev => ({ ...prev, [day]: !prev[day] }));
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -51,8 +56,12 @@ const ProfitLog = () => {
 
   const handleDelete = async (id) => {
     if (!confirm('حذف هذا البند؟')) return;
-    await api.delete(`/profit/${id}`);
-    fetchData();
+    try {
+      await api.delete(`/profit/${id}`);
+      fetchData();
+    } catch (err) {
+      alert(err?.response?.data?.error || err?.message || 'فشل الحذف');
+    }
   };
 
   // بيانات الرسم البياني للدائرة
@@ -69,7 +78,7 @@ const ProfitLog = () => {
 
   const formatCurrency = (val) => {
     const n = parseFloat(val) || 0;
-    return n.toFixed(2);
+    return n.toFixed(1);
   };
 
   if (loading) return <div className="text-center py-12 text-gray-400">جاري التحميل...</div>;
@@ -104,7 +113,7 @@ const ProfitLog = () => {
           <div className="text-lg font-extrabold text-green-700">{formatCurrency(summaryData.total_profit)} ج.م</div>
         </div>
         <div className="bg-gradient-to-br from-teal-50 to-cyan-50 p-4 rounded-2xl shadow-sm border border-teal-100">
-          <div className="text-xs text-gray-500">السيولة الحالية</div>
+          <div className="text-xs text-gray-500">النقدية</div>
           <div className="text-lg font-extrabold text-teal-700">{formatCurrency(summaryData.current_liquidity)} ج.م</div>
         </div>
         <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-4 rounded-2xl shadow-sm border border-blue-100">
@@ -128,7 +137,7 @@ const ProfitLog = () => {
                   <Cell key={`cell-${index}`} fill={entry.color} />
                 ))}
               </Pie>
-              <Tooltip formatter={(value) => `${parseFloat(value).toFixed(2)} ج.م`} />
+              <Tooltip formatter={(value) => `${parseFloat(value).toFixed(1)} ج.م`} />
             </PieChart>
           </ResponsiveContainer>
         </div>
@@ -147,6 +156,7 @@ const ProfitLog = () => {
           <div>
             <label className="text-xs text-gray-500">النوع</label>
             <select value={form.entry_type} onChange={e => setForm({...form, entry_type: e.target.value})} className="w-full border rounded-xl px-3 py-2 text-sm">
+              <option value="opening_balance">رصيد افتتاحي</option>
               <option value="revenue">إيراد (دخل)</option>
               <option value="expense">مصروف</option>
               <option value="profit">ربح صافي</option>
@@ -173,47 +183,93 @@ const ProfitLog = () => {
           <p>لا توجد بنود مسجلة</p>
         </div>
       ) : (
-        <div className="space-y-2">
-          {entries.map((entry, i) => {
-            const isPositive = ['profit', 'revenue', 'sale_revenue'].includes(entry.entry_type);
-            const labels = {
-              profit: 'ربح', revenue: 'إيراد', salary_payment: 'مرتبات',
-              spoilage: 'هالك', expense: 'مصروفات', purchase: 'مشتريات',
-              cogs: 'تكلفة بضاعة'
-            };
-            const icons = {
-              profit: <TrendingUp size={16} className="text-green-600" />,
-              revenue: <TrendingUp size={16} className="text-blue-600" />,
-              expense: <TrendingDown size={16} className="text-red-600" />,
-              spoilage: <AlertTriangle size={16} className="text-orange-600" />,
-              salary_payment: <Users size={16} className="text-purple-600" />,
-              purchase: <ShoppingCart size={16} className="text-cyan-600" />,
-              cogs: <TrendingDown size={16} className="text-amber-600" />,
-            };
+        (() => {
+          // تجميع البنود باليوم
+          const grouped = {};
+          entries.forEach(entry => {
+            const dayKey = new Date(entry.created_at).toLocaleDateString('ar-EG');
+            if (!grouped[dayKey]) grouped[dayKey] = [];
+            grouped[dayKey].push(entry);
+          });
+
+          const labels = {
+            profit: 'ربح', revenue: 'إيراد', salary_payment: 'مرتبات',
+            spoilage: 'هالك', expense: 'مصروفات', purchase: 'مشتريات',
+            cogs: 'تكلفة بضاعة', opening_balance: 'رصيد افتتاحي'
+          };
+          const icons = {
+            profit: <TrendingUp size={16} className="text-green-600" />,
+            revenue: <TrendingUp size={16} className="text-blue-600" />,
+            expense: <TrendingDown size={16} className="text-red-600" />,
+            spoilage: <AlertTriangle size={16} className="text-orange-600" />,
+            salary_payment: <Users size={16} className="text-purple-600" />,
+            purchase: <ShoppingCart size={16} className="text-cyan-600" />,
+            cogs: <TrendingDown size={16} className="text-amber-600" />,
+            opening_balance: <DollarSign size={16} className="text-teal-600" />,
+          };
+          const isPositiveType = (type) => ['profit', 'revenue', 'sale_revenue', 'opening_balance'].includes(type);
+
+          return Object.entries(grouped).map(([day, dayEntries]) => {
+            // حساب ملخص اليوم
+            const dayIncome = dayEntries.reduce((sum, e) => sum + (isPositiveType(e.entry_type) ? (parseFloat(e.amount) || 0) : 0), 0);
+            const dayOutcome = dayEntries.reduce((sum, e) => sum + (!isPositiveType(e.entry_type) ? (parseFloat(e.amount) || 0) : 0), 0);
+            const dayNet = dayIncome - dayOutcome;
+            const isOpen = expandedDays[day] !== false; // default open
 
             return (
-              <div key={entry.id || i} className="bg-white p-3 rounded-2xl shadow-sm border-r-4 flex items-center gap-3"
-                style={{ borderRightColor: isPositive ? '#22c55e' : '#ef4444' }}>
-                <div className={`p-2 rounded-lg ${isPositive ? 'bg-green-50' : 'bg-red-50'}`}>
-                  {icons[entry.entry_type] || icons.expense}
-                </div>
-                <div className="flex-1">
+              <div key={day} className="mb-3">
+                {/* عنوان اليوم - قابل للضغط */}
+                <button
+                  onClick={() => toggleDay(day)}
+                  className="w-full flex items-center justify-between bg-white p-3 rounded-2xl shadow-sm border hover:shadow-md transition-all mb-1"
+                >
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-gray-700 text-sm">{labels[entry.entry_type] || entry.entry_type}</span>
-                    {entry.description && <span className="text-xs text-gray-500">- {entry.description}</span>}
+                    {isOpen ? <ChevronDown size={16} className="text-gray-400" /> : <ChevronLeft size={16} className="text-gray-400" />}
+                    <Calendar size={14} className="text-gray-400" />
+                    <span className="font-bold text-gray-700 text-sm">{day}</span>
+                    <span className="text-[10px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{dayEntries.length} بنود</span>
                   </div>
-                  <div className="text-xs text-gray-400">{new Date(entry.created_at).toLocaleDateString('ar-EG')}</div>
-                </div>
-                <div className={`font-bold ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
-                  {entry.signed_amount ? (parseFloat(entry.signed_amount) > 0 ? '+' : '') + formatCurrency(entry.signed_amount) : formatCurrency(entry.amount)} ج.م
-                </div>
-                <button onClick={() => handleDelete(entry.id)} className="text-red-400 hover:text-red-600 p-1">
-                  <Trash2 size={16} />
+                  <div className="flex gap-2 text-[11px]">
+                    <span className="text-green-600 font-bold">دخل {formatCurrency(dayIncome)}</span>
+                    <span className="text-red-600 font-bold">مصروفات {formatCurrency(dayOutcome)}</span>
+                    <span className={`font-bold px-2 py-0.5 rounded-full ${dayNet >= 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                      صافي {dayNet >= 0 ? '+' : ''}{formatCurrency(dayNet)}
+                    </span>
+                  </div>
                 </button>
+
+                {/* البنود - تظهر فقط لو اليوم مفتوح */}
+                {isOpen && (
+                  <div className="space-y-1.5 pr-2">
+                    {dayEntries.map((entry, i) => {
+                      const isPositive = isPositiveType(entry.entry_type);
+                      return (
+                        <div key={entry.id || i} className="bg-white p-3 rounded-2xl shadow-sm border-r-4 flex items-center gap-3"
+                          style={{ borderRightColor: isPositive ? '#22c55e' : '#ef4444' }}>
+                          <div className={`p-2 rounded-lg ${isPositive ? 'bg-green-50' : 'bg-red-50'}`}>
+                            {icons[entry.entry_type] || icons.expense}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-bold text-gray-700 text-sm">{labels[entry.entry_type] || entry.entry_type}</span>
+                              {entry.description && <span className="text-xs text-gray-500 truncate">- {entry.description}</span>}
+                            </div>
+                          </div>
+                          <div className={`font-bold text-sm shrink-0 ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
+                            {isPositive ? '+' : '-'}{formatCurrency(entry.amount)} ج.م
+                          </div>
+                          <button onClick={() => handleDelete(entry.id)} className="text-red-400 hover:text-red-600 p-1 shrink-0">
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             );
-          })}
-        </div>
+          });
+        })()
       )}
     </div>
   );

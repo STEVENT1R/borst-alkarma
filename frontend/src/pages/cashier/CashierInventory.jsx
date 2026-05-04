@@ -255,15 +255,15 @@ const CashierInventory = () => {
               </div>
               <div className="grid grid-cols-3 gap-2 text-xs text-gray-500">
                 <div className="bg-green-50 p-2 rounded-lg text-center">
-                  <div className="text-green-700 font-bold">{parseFloat(product.quantity).toFixed(2)}</div>
+                  <div className="text-green-700 font-bold">{parseFloat(product.quantity).toFixed(1)}</div>
                   <div>{product.unit_type === 'weight' ? 'كجم' : 'قطعة'}</div>
                 </div>
                 <div className="bg-amber-50 p-2 rounded-lg text-center">
-                  <div className="text-amber-700 font-bold">{parseFloat(product.purchase_price || 0).toFixed(2)} ج</div>
+                  <div className="text-amber-700 font-bold">{parseFloat(product.purchase_price || 0).toFixed(1)} ج</div>
                   <div>سعر الشراء</div>
                 </div>
                 <div className="bg-purple-50 p-2 rounded-lg text-center">
-                  <div className="text-purple-700 font-bold">{parseFloat(product.retail_price || 0).toFixed(2)} ج</div>
+                  <div className="text-purple-700 font-bold">{parseFloat(product.retail_price || 0).toFixed(1)} ج</div>
                   <div>سعر التجزئة</div>
                 </div>
               </div>

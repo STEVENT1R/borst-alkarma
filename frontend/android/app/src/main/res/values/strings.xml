@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">بورصة الكرمه</string>
+    <string name="title_activity_main">بورصة الكرمه</string>
+    <string name="package_name">com.borstalkarma.app</string>
+    <string name="custom_url_scheme">com.borstalkarma.app</string>
+</resources>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../../services/api';
-import { Clock, Trash2, AlertTriangle, Shield, CheckCircle } from 'lucide-react';
+import { Clock, Trash2, AlertTriangle, Shield, CheckCircle, Database } from 'lucide-react';
 
 const AutoDelete = () => {
   const [months, setMonths] = useState(6);
@@ -8,6 +8,9 @@ const AutoDelete = () => {
   const [cleaning, setCleaning] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
   const [result, setResult] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteResult, setDeleteResult] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -33,6 +36,27 @@ const AutoDelete = () => {
       setMessage({ type: 'error', text: err.response?.data?.error || 'فشل الحفظ' });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleClearAllData = async () => {
+    if (!deleteConfirm) {
+      setDeleteConfirm(true);
+      return;
+    }
+    
+    if (!window.confirm('⚠️ تأكيد نهائي: هل أنت متأكد تماماً من حذف كل البيانات؟ هذه العملية لا يمكن التراجع عنها!\n\nسيتم الاحتفاظ بجميع الحسابات المسجلة فقط.')) return;
+    
+    setDeleting(true);
+    setDeleteResult(null);
+    try {
+      const res = await api.post('/settings/clear-all-data', { confirm: 'YES' });
+      setDeleteResult({ type: 'success', text: res.data.message, deleted: res.data.deleted });
+      setDeleteConfirm(false);
+    } catch (err) {
+      setDeleteResult({ type: 'error', text: err.response?.data?.error || 'فشلت عملية الحذف' });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -161,8 +185,9 @@ const AutoDelete = () => {
               <span className="font-bold text-gray-800">{result.notifications}</span>
             </div>
             <div className="bg-gray-50 p-3 rounded-xl flex justify-between">
-              <span className="text-gray-500">سجل الأداء</span>
+              <span className="text-gray-500">الجرد</span>
               <span className="font-bold text-gray-800">{result.performance_log}</span>
+
             </div>
           </div>
           <div className="bg-yellow-50 p-3 rounded-xl flex items-start gap-2 text-sm text-yellow-700">
@@ -172,8 +197,44 @@ const AutoDelete = () => {
         </div>
       )}
 
+      {/* مسح كل البيانات */}
+      <div className="bg-white p-6 rounded-2xl shadow-sm border border-red-100 mb-6 space-y-4">
+        <div className="flex items-center gap-2">
+          <Database size={20} className="text-red-600" />
+          <h4 className="font-bold text-gray-800">حذف جميع البيانات</h4>
+        </div>
+        <p className="text-sm text-gray-500 pr-7">
+          مسح كل البيانات (المهام، الأرباح، المخزون، المشتريات، المستلمين، الرواتب...) مع الاحتفاظ بجميع الحسابات المسجلة.
+        </p>
+
+        {deleteResult && (
+          <div className={`p-3 rounded-xl text-sm ${deleteResult.type === 'success' ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-red-100 text-red-700 border border-red-200'}`}>
+            <p className="font-bold mb-1">{deleteResult.text}</p>
+            {deleteResult.deleted && (
+              <div className="grid grid-cols-2 gap-1 text-xs mt-2">
+                {Object.entries(deleteResult.deleted).map(([key, val]) => (
+                  <div key={key} className="flex justify-between">
+                    <span>{key}</span>
+                    <span className="font-bold">{val}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        <button
+          onClick={handleClearAllData}
+          disabled={deleting}
+          className="w-full bg-gradient-to-r from-red-600 to-red-500 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:from-red-700 hover:to-red-600 transition-colors disabled:opacity-50"
+        >
+          <Trash2 size={18} />
+          {deleting ? 'جاري الحذف...' : deleteConfirm ? 'اضغط مرة أخرى للتأكيد' : 'حذف جميع البيانات'}
+        </button>
+      </div>
+
       {/* تنبيه */}
-      <div className="bg-amber-50 p-4 rounded-2xl border border-amber-200 flex items-start gap-3 mt-6">
+      <div className="bg-amber-50 p-4 rounded-2xl border border-amber-200 flex items-start gap-3">
         <AlertTriangle size={20} className="text-amber-600 shrink-0 mt-0.5" />
         <div className="text-sm text-amber-800">
           <p className="font-bold mb-1">تنبيه هام</p>

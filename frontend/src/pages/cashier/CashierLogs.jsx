@@ -165,7 +165,7 @@ const CashierLogs = () => {
                             <div className="flex items-center justify-between mb-1">
                               <span className="font-bold text-sm">{tx.product_name}</span>
                               <span className={`font-bold text-sm ${parseFloat(tx.quantity_change) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                {parseFloat(tx.quantity_change) >= 0 ? '+' : ''}{parseFloat(tx.quantity_change).toFixed(2)}
+                                {parseFloat(tx.quantity_change) >= 0 ? '+' : ''}{parseFloat(tx.quantity_change).toFixed(1)}
                               </span>
                             </div>
                             <div className="flex items-center justify-between text-xs text-gray-400">
@@ -214,8 +214,8 @@ const CashierLogs = () => {
                       </div>
                       <div className="flex items-center gap-3">
                         <div className="text-xs flex gap-2">
-                          <span className="text-green-600 font-bold">{totalAmount.toFixed(2)} ج</span>
-                          <span className="text-blue-600 font-bold">ربح {totalProfit.toFixed(2)} ج</span>
+                          <span className="text-green-600 font-bold">{totalAmount.toFixed(1)} ج</span>
+                          <span className="text-blue-600 font-bold">ربح {totalProfit.toFixed(1)} ج</span>
                         </div>
                         {isOpen ? <ChevronUp size={18} className="text-gray-400" /> : <ChevronDown size={18} className="text-gray-400" />}
                       </div>
@@ -230,14 +230,14 @@ const CashierLogs = () => {
                             <div key={sale.id} className="p-3 pr-8">
                               <div className="flex items-center justify-between mb-1">
                                 <span className="font-bold text-sm">{sale.product_name}</span>
-                                <span className="font-bold text-green-600">{total.toFixed(2)} ج</span>
+                                <span className="font-bold text-green-600">{total.toFixed(1)} ج</span>
                               </div>
                               <div className="flex items-center justify-between text-xs text-gray-400">
                                 <span>
-                                  {sale.quantity} {sale.unit_type === 'weight' ? 'كجم' : 'قطعة'} × {price.toFixed(2)} ج
+                                  {sale.quantity} {sale.unit_type === 'weight' ? 'كجم' : 'قطعة'} × {price.toFixed(1)} ج
                                 </span>
                                 <div className="flex gap-2">
-                                  <span className="text-blue-600">ربح {profit.toFixed(2)} ج</span>
+                                  <span className="text-blue-600">ربح {profit.toFixed(1)} ج</span>
                                   <span>{new Date(sale.created_at).toLocaleTimeString('ar-EG')}</span>
                                 </div>
                               </div>

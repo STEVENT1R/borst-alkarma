@@ -63,8 +63,8 @@ const InventoryLog = () => {
                   </div>
                   <div className="flex items-center gap-3">
                     <div className="text-center">
-                      {additions > 0 && <div className="text-xs text-green-600 font-bold">+{additions.toFixed(2)}</div>}
-                      {deductions > 0 && <div className="text-xs text-red-600 font-bold">-{deductions.toFixed(2)}</div>}
+                      {additions > 0 && <div className="text-xs text-green-600 font-bold">+{additions.toFixed(1)}</div>}
+                      {deductions > 0 && <div className="text-xs text-red-600 font-bold">-{deductions.toFixed(1)}</div>}
                     </div>
                     <ChevronLeft
                       size={18}

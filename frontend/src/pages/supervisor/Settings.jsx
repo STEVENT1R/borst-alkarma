@@ -1,15 +1,41 @@
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, User, Shield, Users, DollarSign, FileText, TrendingUp, Trash2 } from 'lucide-react';
+import { LogOut, User, Users, DollarSign, FileText, TrendingUp, Trash2, AlertTriangle } from 'lucide-react';
+import { useState } from 'react';
+import api from '../../services/api';
 import PushNotification from '../../components/PushNotification';
 
 const Settings = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [deleting, setDeleting] = useState(false);
+  const [deleteResult, setDeleteResult] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
 
   const handleLogout = () => {
     logout();
     navigate('/login');
+  };
+
+  const handleClearAllData = async () => {
+    if (!deleteConfirm) {
+      setDeleteConfirm(true);
+      return;
+    }
+    
+    if (!window.confirm('⚠️ تأكيد نهائي: هل أنت متأكد تماماً من حذف كل البيانات؟ هذه العملية لا يمكن التراجع عنها!\n\nسيتم الاحتفاظ بجميع الحسابات المسجلة فقط.')) return;
+    
+    setDeleting(true);
+    setDeleteResult(null);
+    try {
+      const res = await api.post('/settings/clear-all-data', { confirm: 'YES' });
+      setDeleteResult({ type: 'success', text: res.data.message, deleted: res.data.deleted });
+      setDeleteConfirm(false);
+    } catch (err) {
+      setDeleteResult({ type: 'error', text: err.response?.data?.error || 'فشلت عملية الحذف' });
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
@@ -47,15 +73,47 @@ const Settings = () => {
           <div className="bg-yellow-100 p-3 rounded-xl"><TrendingUp className="text-yellow-600" size={22} /></div>
           <span className="font-bold text-gray-800">سجل الربح</span>
         </button>
-        <button onClick={() => navigate('/supervisor/auto-delete')} className="w-full flex items-center gap-4 bg-white p-4 rounded-2xl shadow-sm border hover:border-green-300 transition-colors">
-          <div className="bg-red-100 p-3 rounded-xl"><Trash2 className="text-red-600" size={22} /></div>
-          <span className="font-bold text-gray-800">حذف تلقائي</span>
+      </div>
+
+      {/* حذف كل البيانات يدوي */}
+      <div className="bg-white p-4 rounded-2xl shadow-sm border border-red-100 mt-6 space-y-3">
+        <div className="flex items-center gap-2">
+          <AlertTriangle size={20} className="text-red-600" />
+          <h4 className="font-bold text-gray-800">حذف البيانات</h4>
+        </div>
+        <p className="text-xs text-gray-500">
+          مسح كل البيانات (المهام، الأرباح، المخزون، المشتريات، المستلمين، الرواتب...) مع الاحتفاظ بجميع الحسابات المسجلة.
+        </p>
+
+        {deleteResult && (
+          <div className={`p-3 rounded-xl text-sm ${deleteResult.type === 'success' ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-red-100 text-red-700 border border-red-200'}`}>
+            <p className="font-bold mb-1">{deleteResult.text}</p>
+            {deleteResult.deleted && (
+              <div className="grid grid-cols-2 gap-1 text-xs mt-2">
+                {Object.entries(deleteResult.deleted).map(([key, val]) => (
+                  <div key={key} className="flex justify-between">
+                    <span>{key}</span>
+                    <span className="font-bold">{val}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        <button
+          onClick={handleClearAllData}
+          disabled={deleting}
+          className="w-full bg-gradient-to-r from-red-600 to-red-500 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:from-red-700 hover:to-red-600 transition-colors disabled:opacity-50"
+        >
+          <Trash2 size={18} />
+          {deleting ? 'جاري الحذف...' : deleteConfirm ? 'اضغط مرة أخرى للتأكيد' : 'حذف جميع البيانات'}
         </button>
       </div>
 
       <button
         onClick={handleLogout}
-        className="w-full mt-6 bg-gradient-to-r from-red-500 to-red-400 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2"
+        className="w-full mt-4 bg-gradient-to-r from-red-500 to-red-400 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2"
       >
         <LogOut size={18} /> تسجيل الخروج
       </button>

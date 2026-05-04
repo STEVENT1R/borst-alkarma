@@ -28,11 +28,12 @@ const BottomNav = () => {
   if (user?.role === 'cashier') {
     return (
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 pb-2 pt-1">
-        <div className="grid grid-cols-4 w-full">
+        <div className="grid grid-cols-5 w-full">
           <NavButton icon={<Home size={20} />} label="الرئيسية" active={isActive('/cashier') && !location.pathname.includes('/cashier/')} onClick={() => navigate('/cashier')} />
           <NavButton icon={<ShoppingCart size={20} />} label="البيع" active={isActive('/cashier/sales')} onClick={() => navigate('/cashier/sales')} />
           <NavButton icon={<Package size={20} />} label="المخزن" active={isActive('/cashier/inventory')} onClick={() => navigate('/cashier/inventory')} />
           <NavButton icon={<FileText size={20} />} label="السجلات" active={isActive('/cashier/logs')} onClick={() => navigate('/cashier/logs')} />
+          <NavButton icon={<Settings size={20} />} label="الإعدادات" active={isActive('/cashier/settings')} onClick={() => navigate('/cashier/settings')} />
         </div>
       </nav>
     );

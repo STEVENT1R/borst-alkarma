@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
-import { Play, Send, XCircle, Clock, Truck, Package, Store } from 'lucide-react';
+import { Play, Send, XCircle, Clock } from 'lucide-react';
 
 const WorkerTasks = () => {
   const { user } = useAuth();
@@ -35,9 +35,7 @@ const WorkerTasks = () => {
     'cancelled': 'ملغية',
     'delivered': 'تم التحميل',
     'loaded': 'تم استلام الأموال',
-
     'delivered_and_loaded': 'تم التحميل والاستلام',
-    'money_delivery': 'تم الاستلاف'
   };
 
   if (loading) return <div className="text-center py-8">تحميل...</div>;
@@ -57,11 +55,7 @@ const WorkerTasks = () => {
             <div className="text-sm text-gray-500 mt-2">
               {task.product_name && `${task.product_name} | `}
               {task.quantity > 0 && `كمية: ${task.quantity} ${task.unit_type === 'weight' ? 'كجم' : task.unit_type === 'unit' ? 'قطعة' : ''} | `}
-              سعر: {task.price} | 
-              <span className={`inline-flex items-center gap-0.5 ${task.sale_type === 'wholesale' ? 'text-blue-600' : 'text-green-600'}`}>
-                {task.sale_type === 'wholesale' ? <Package size={12} /> : <Store size={12} />}
-                {task.sale_type === 'wholesale' ? ' جملة' : ' قطاعي'}
-              </span>
+              سعر: {task.price}
             </div>
             {task.receiver_name && <div className="text-sm text-gray-500">المستلم: {task.receiver_name}</div>}
             {task.notes && <div className="text-sm text-gray-500 mt-1 bg-blue-50 p-2 rounded-lg">📝 {task.notes}</div>}

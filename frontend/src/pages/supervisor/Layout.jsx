@@ -12,7 +12,7 @@ import BottomNav from '../../components/BottomNav';
 import TopBar from '../../components/TopBar';
 import WorkerManagement from './WorkerManagement';
 import SalaryManagement from './SalaryManagement';
-import AutoDelete from './AutoDelete';
+import SalaryLog from './SalaryLog';
 import ReceiversLog from './ReceiversLog';
 import ProfitLog from './ProfitLog';
 import PerformanceLog from './PerformanceLog';
@@ -38,7 +38,7 @@ const SupervisorLayout = () => (
         <Route path="reports" element={<SupervisorReports />} />
         <Route path="manage-workers" element={<WorkerManagement />} />
         <Route path="manage-salaries" element={<SalaryManagement />} />
-        <Route path="auto-delete" element={<AutoDelete />} />
+        <Route path="salary-log" element={<SalaryLog />} />
         <Route path="receivers-log" element={<ReceiversLog />} />
         <Route path="profit-log" element={<ProfitLog />} />
         <Route path="performance-log" element={<PerformanceLog />} />

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../../services/api';
-import { DollarSign, Save, Wallet, TrendingDown, TrendingUp } from 'lucide-react';
+import { DollarSign, Save, Wallet } from 'lucide-react';
 
 const SalaryManagement = () => {
   const [workers, setWorkers] = useState([]);
@@ -10,6 +10,10 @@ const SalaryManagement = () => {
   const [payAmount, setPayAmount] = useState('');
   const [showPayModal, setShowPayModal] = useState(false);
   const [payWorker, setPayWorker] = useState(null);
+  const [payDeduction, setPayDeduction] = useState('');
+  const [payDeductionReason, setPayDeductionReason] = useState('');
+  const [payBonus, setPayBonus] = useState('');
+  const [payBonusReason, setPayBonusReason] = useState('');
 
   useEffect(() => {
     api.get('/salaries/summary')
@@ -51,6 +55,10 @@ const SalaryManagement = () => {
   const openPayModal = (worker) => {
     setPayWorker(worker);
     setPayAmount(worker.net_salary || '');
+    setPayDeduction('');
+    setPayDeductionReason('');
+    setPayBonus('');
+    setPayBonusReason('');
     setShowPayModal(true);
   };
 
@@ -59,12 +67,20 @@ const SalaryManagement = () => {
     try {
       await api.post('/salaries/pay', {
         worker_id: payWorker.worker_id,
-        amount: parseFloat(payAmount)
+        amount: parseFloat(payAmount),
+        deduction_amount: parseFloat(payDeduction) || 0,
+        deduction_reason: payDeductionReason || null,
+        bonus_amount: parseFloat(payBonus) || 0,
+        bonus_reason: payBonusReason || null,
       });
       setMessage({ type: 'success', text: `تم إيداع ${payAmount} ج.م لـ ${payWorker.username}` });
       setShowPayModal(false);
       setPayAmount('');
       setPayWorker(null);
+      setPayDeduction('');
+      setPayDeductionReason('');
+      setPayBonus('');
+      setPayBonusReason('');
       // Refresh
       const res = await api.get('/salaries/summary');
       setWorkers(res.data);
@@ -117,7 +133,7 @@ const SalaryManagement = () => {
             <div className="bg-gray-50 p-3 rounded-xl flex justify-between">
               <span className="font-bold">الصافي المتوقع</span>
               <span className="font-bold text-green-700">
-                {((parseFloat(salaryData.base_salary) || 0) - (parseFloat(salaryData.deduction) || 0) + (parseFloat(salaryData.bonus) || 0)).toFixed(2)} ج.م
+                {((parseFloat(salaryData.base_salary) || 0) - (parseFloat(salaryData.deduction) || 0) + (parseFloat(salaryData.bonus) || 0)).toFixed(1)} ج.م
               </span>
             </div>
             <div className="flex gap-3">
@@ -179,6 +195,58 @@ const SalaryManagement = () => {
                   className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50"
                   autoFocus
                 />
+              </div>
+              <div className="border-t pt-4">
+                <h5 className="font-bold text-sm text-gray-700 mb-3">خصم (اختياري)</h5>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">مبلغ الخصم</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={payDeduction}
+                      onChange={e => setPayDeduction(e.target.value)}
+                      className="w-full p-2.5 border border-gray-200 rounded-xl bg-gray-50 text-sm"
+                      placeholder="0"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">سبب الخصم</label>
+                    <input
+                      type="text"
+                      value={payDeductionReason}
+                      onChange={e => setPayDeductionReason(e.target.value)}
+                      className="w-full p-2.5 border border-gray-200 rounded-xl bg-gray-50 text-sm"
+                      placeholder="مثال: تأخير"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="border-t pt-4">
+                <h5 className="font-bold text-sm text-gray-700 mb-3">زيادة (اختياري)</h5>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">مبلغ الزيادة</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={payBonus}
+                      onChange={e => setPayBonus(e.target.value)}
+                      className="w-full p-2.5 border border-gray-200 rounded-xl bg-gray-50 text-sm"
+                      placeholder="0"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">سبب الزيادة</label>
+                    <input
+                      type="text"
+                      value={payBonusReason}
+                      onChange={e => setPayBonusReason(e.target.value)}
+                      className="w-full p-2.5 border border-gray-200 rounded-xl bg-gray-50 text-sm"
+                      placeholder="مثال: عمل إضافي"
+                    />
+                  </div>
+                </div>
               </div>
               <div className="flex gap-3">
                 <button

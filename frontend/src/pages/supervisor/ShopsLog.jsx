@@ -81,7 +81,7 @@ const ShopsLog = () => {
 
   const formatCurrency = (val) => {
     const n = parseFloat(val || 0);
-    return n.toFixed(2);
+    return n.toFixed(1);
   };
 
   const formatDate = (dateStr) => {
@@ -270,7 +270,7 @@ const ShopsLog = () => {
                         <div className="flex items-center justify-between mb-2">
                           <span className="font-bold text-gray-800">{product.product_name}</span>
                           <span className="text-sm bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">
-                            {parseFloat(product.quantity || 0).toFixed(2)} {product.unit_type === 'weight' ? 'كجم' : 'قطعة'}
+                            {parseFloat(product.quantity || 0).toFixed(1)} {product.unit_type === 'weight' ? 'كجم' : 'قطعة'}
                           </span>
                         </div>
                         <div className="grid grid-cols-2 gap-2 text-xs text-gray-500">
@@ -404,7 +404,7 @@ const ShopsLog = () => {
                                 <div className="text-right">
                                   <span className={`font-bold text-xs ${parseFloat(tx.quantity_change) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                                     {parseFloat(tx.quantity_change) >= 0 ? '+' : ''}
-                                    {parseFloat(tx.quantity_change || 0).toFixed(2)}
+                                    {parseFloat(tx.quantity_change || 0).toFixed(1)}
                                   </span>
                                   <div className="text-[9px] text-gray-400">
                                     {tx.transaction_type === 'addition' ? 'إضافة' :

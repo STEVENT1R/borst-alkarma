@@ -59,14 +59,14 @@ const PerformanceReport = () => {
             <TrendingUp size={16} className="text-green-600" />
             <span className="text-xs">إجمالي الدخل</span>
           </div>
-          <div className="text-xl font-extrabold text-green-700">{parseFloat(financial.total_income).toFixed(2)} ج.م</div>
+          <div className="text-xl font-extrabold text-green-700">{parseFloat(financial.total_income).toFixed(1)} ج.م</div>
         </div>
         <div className="bg-gradient-to-br from-red-50 to-rose-50 p-4 rounded-2xl shadow-sm border border-red-100">
           <div className="flex items-center gap-1 text-gray-600 mb-1">
             <TrendingDown size={16} className="text-red-600" />
             <span className="text-xs">إجمالي المصروفات</span>
           </div>
-          <div className="text-xl font-extrabold text-red-700">{parseFloat(financial.total_outcome).toFixed(2)} ج.م</div>
+          <div className="text-xl font-extrabold text-red-700">{parseFloat(financial.total_outcome).toFixed(1)} ج.م</div>
         </div>
         <div className="col-span-2 bg-gradient-to-br from-blue-50 to-cyan-50 p-4 rounded-2xl shadow-sm border border-blue-100">
           <div className="flex items-center gap-1 text-gray-600 mb-1">
@@ -74,7 +74,7 @@ const PerformanceReport = () => {
             <span className="text-xs">صافي الربح</span>
           </div>
           <div className={`text-2xl font-extrabold ${parseFloat(financial.net_profit) >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-            {parseFloat(financial.net_profit).toFixed(2)} ج.م
+            {parseFloat(financial.net_profit).toFixed(1)} ج.م
           </div>
         </div>
       </div>
@@ -103,7 +103,7 @@ const PerformanceReport = () => {
         </div>
         <div className="col-span-2 bg-white p-4 rounded-2xl shadow-sm border">
           <div className="text-xs text-gray-500">قيمة المهام المنجزة</div>
-          <div className="text-2xl font-bold text-gray-800">{parseFloat(tasks.completed_value).toFixed(2)} ج.م</div>
+          <div className="text-2xl font-bold text-gray-800">{parseFloat(tasks.completed_value).toFixed(1)} ج.م</div>
         </div>
       </div>
 
@@ -123,7 +123,7 @@ const PerformanceReport = () => {
                 </div>
                 <div className="flex justify-between text-sm text-gray-500 mb-2">
                   <span>ملغية: {w.cancelled_tasks}</span>
-                  <span>قيمة: {parseFloat(w.total_value).toFixed(2)} ج.م</span>
+                  <span>قيمة: {parseFloat(w.total_value).toFixed(1)} ج.م</span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
                   <div className={`h-2 rounded-full ${rate >= 70 ? 'bg-green-500' : rate >= 40 ? 'bg-yellow-500' : 'bg-red-500'}`} style={{ width: `${rate}%` }} />
@@ -147,7 +147,7 @@ const PerformanceReport = () => {
         </div>
         <div className="col-span-2 bg-white p-4 rounded-2xl shadow-sm border">
           <div className="text-xs text-gray-500">قيمة المخزون (بسعر الشراء)</div>
-          <div className="text-2xl font-bold text-gray-800">{parseFloat(inventory.inventory_value).toFixed(2)} ج.م</div>
+          <div className="text-2xl font-bold text-gray-800">{parseFloat(inventory.inventory_value).toFixed(1)} ج.م</div>
         </div>
       </div>
 
@@ -156,11 +156,11 @@ const PerformanceReport = () => {
       <div className="grid grid-cols-2 gap-3 mb-6">
         <div className="bg-white p-4 rounded-2xl shadow-sm border">
           <div className="text-xs text-gray-500">ديون علينا</div>
-          <div className="text-xl font-bold text-red-700">{parseFloat(receivers.total_debts_on_us).toFixed(2)} ج.م</div>
+          <div className="text-xl font-bold text-red-700">{parseFloat(receivers.total_debts_on_us).toFixed(1)} ج.م</div>
         </div>
         <div className="bg-white p-4 rounded-2xl shadow-sm border">
           <div className="text-xs text-gray-500">محصل من الناس</div>
-          <div className="text-xl font-bold text-green-700">{parseFloat(receivers.total_money_collected).toFixed(2)} ج.م</div>
+          <div className="text-xl font-bold text-green-700">{parseFloat(receivers.total_money_collected).toFixed(1)} ج.م</div>
         </div>
       </div>
 
