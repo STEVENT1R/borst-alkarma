@@ -12,9 +12,7 @@ router.get('/', auth, async (req, res) => {
         COALESCE((
           SELECT SUM(rt.amount) 
           FROM receiver_transactions rt
-          LEFT JOIN tasks t ON t.id = rt.task_id
           WHERE rt.receiver_id = r.id
-          AND (t.id IS NULL OR t.status NOT IN ('completed', 'cancelled'))
         ), 0) as balance
       FROM receivers r
       ORDER BY r.name
@@ -148,12 +146,13 @@ router.get('/summary', auth, role('supervisor'), async (req, res) => {
   try {
     const result = await db.query(`
       SELECT 
-        COALESCE(SUM(rt.amount), 0) as total_balance,
-        COALESCE(SUM(CASE WHEN rt.amount > 0 THEN rt.amount ELSE 0 END), 0) as total_we_are_owed,
-        COALESCE(SUM(CASE WHEN rt.amount < 0 THEN rt.amount ELSE 0 END), 0) as total_we_owe
-      FROM receiver_transactions rt
-      LEFT JOIN tasks t ON t.id = rt.task_id
-      WHERE (t.id IS NULL OR t.status NOT IN ('completed', 'cancelled'))
+        COALESCE(SUM(CASE WHEN sub.net_balance > 0 THEN sub.net_balance ELSE 0 END), 0) as total_we_are_owed,
+        COALESCE(SUM(CASE WHEN sub.net_balance < 0 THEN sub.net_balance ELSE 0 END), 0) as total_we_owe
+      FROM (
+        SELECT receiver_id, SUM(amount) as net_balance
+        FROM receiver_transactions
+        GROUP BY receiver_id
+      ) sub
     `);
     res.json(result.rows[0]);
   } catch (err) {
@@ -186,15 +185,6 @@ router.post('/:id/pay', auth, async (req, res) => {
        VALUES ('revenue', $1, $2, 'receiver', $3)`,
       [Math.abs(parseFloat(amount)), `تحصيل من مستلم: ${description || ''}`, id]
     );
-
-    // إشعار المشرفين
-    const supers = await db.query("SELECT id FROM users WHERE role = 'supervisor'");
-    for (const s of supers.rows) {
-      await db.query(
-        'INSERT INTO notifications (user_id, message) VALUES ($1, $2)',
-        [s.id, `تم استلام ${amount} ج.م من مستلم`]
-      );
-    }
 
     res.status(201).json(result.rows[0]);
   } catch (err) {

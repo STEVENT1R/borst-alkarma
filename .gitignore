@@ -8,3 +8,11 @@ task-progress.md
 e
 render.yaml
 backend/Procfile
+ssh-key-*.key
+ssh-key-*.key.pub
+
+# Local Netlify folder
+.netlify
+
+.vercel
+"backend/src/config/firebase.json"  

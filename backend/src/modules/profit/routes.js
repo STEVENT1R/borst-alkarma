@@ -19,7 +19,7 @@ router.get('/', auth, role('supervisor'), async (req, res) => {
   }
 });
 
-// GET /api/profit/summary - ملخص الربح والسيولة
+// GET /api/profit/summary - ملخص الربح والسيولة (كامل)
 router.get('/summary', auth, role('supervisor'), async (req, res) => {
   try {
     const result = await db.query(`
@@ -37,15 +37,58 @@ router.get('/summary', auth, role('supervisor'), async (req, res) => {
             ELSE 0
           END
         ), 0) as total_profit,
-        -- السيولة = كل الداخل - كل الخارج النقدي (المشتريات خروج نقدي، cogs مش خروج نقدي)
+        -- النقدية = كل الداخل - كل الخارج النقدي
         COALESCE(SUM(
           CASE 
-            WHEN entry_type IN ('revenue', 'profit', 'sale_revenue') THEN amount
+            WHEN entry_type IN ('revenue', 'profit', 'sale_revenue', 'opening_balance') THEN amount
             WHEN entry_type IN ('salary_payment', 'spoilage', 'expense', 'purchase') THEN -amount
             ELSE 0
           END
-        ), 0) as current_liquidity
+        ), 0) as current_liquidity,
+        -- قيمة المخزن = مجموع (الكمية × سعر الشراء) لكل المنتجات
+        COALESCE(
+          (SELECT SUM(quantity * purchase_price) FROM inventory WHERE quantity > 0 AND purchase_price > 0),
+          0
+        ) as inventory_value
       FROM profit_log
+    `);
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// GET /api/profit/today - ملخص اليوم (صافي الإيراد اليوم وصافي الربح اليوم)
+router.get('/today', auth, role('supervisor'), async (req, res) => {
+  try {
+    const result = await db.query(`
+      SELECT
+        -- صافي الإيراد اليوم = الإيرادات - المصروفات - المرتبات - الهالك
+        COALESCE(SUM(
+          CASE 
+            WHEN entry_type IN ('revenue', 'profit', 'sale_revenue') THEN amount
+            WHEN entry_type IN ('expense', 'salary_payment', 'spoilage') THEN -amount
+            ELSE 0
+          END
+        ), 0) as net_revenue_today,
+        -- صافي الربح اليوم = الإيرادات - تكلفة البضاعة - المصروفات - المرتبات - الهالك
+        COALESCE(SUM(
+          CASE 
+            WHEN entry_type IN ('revenue', 'profit', 'sale_revenue') THEN amount
+            WHEN entry_type IN ('cogs', 'expense', 'salary_payment', 'spoilage') THEN -amount
+            ELSE 0
+          END
+        ), 0) as net_profit_today,
+        -- تفاصيل للمساعدة
+        COALESCE(SUM(CASE WHEN entry_type IN ('revenue', 'sale_revenue') THEN amount ELSE 0 END), 0) as gross_revenue_today,
+        COALESCE(SUM(CASE WHEN entry_type = 'spoilage' THEN amount ELSE 0 END), 0) as spoilage_today,
+        COALESCE(SUM(CASE WHEN entry_type = 'expense' THEN amount ELSE 0 END), 0) as expenses_today,
+        COALESCE(SUM(CASE WHEN entry_type = 'salary_payment' THEN amount ELSE 0 END), 0) as salaries_today
+      FROM profit_log
+      WHERE created_at::date = CURRENT_DATE
+        AND entry_type != 'opening_balance'
+
     `);
     res.json(result.rows[0]);
   } catch (err) {
@@ -73,27 +116,18 @@ router.post('/', auth, role('supervisor'), async (req, res) => {
   }
 });
 
-// DELETE /api/profit/:id - حذف بند (للبنود اليدوية فقط)
+// DELETE /api/profit/:id - حذف بند من سجل الربح
 router.delete('/:id', auth, role('supervisor'), async (req, res) => {
   try {
     const { id } = req.params;
 
-    // جلب البند للتحقق من نوعه
+    // التحقق من وجود البند
     const item = await db.query('SELECT * FROM profit_log WHERE id = $1', [id]);
     if (item.rows.length === 0) {
       return res.status(404).json({ error: 'البند غير موجود' });
     }
 
-    const entry = item.rows[0];
-
-    // منع حذف البنود المرتبطة بعمليات أخرى (مهام، مشتريات، مرتبات...)
-    if (entry.reference_type && entry.reference_id) {
-      return res.status(400).json({ 
-        error: 'لا يمكن حذف هذا البند مباشرة لأنه مرتبط بعملية أخرى. يجب حذف العملية الأصلية أولاً.' 
-      });
-    }
-
-    // لو البند يدوي (بدون reference)، نسمح بحذفه
+    // حذف البند (بدون قيود - المشرف يمكنه حذف أي بند)
     await db.query('DELETE FROM profit_log WHERE id = $1', [id]);
     res.json({ message: 'تم حذف البند بنجاح' });
   } catch (err) {

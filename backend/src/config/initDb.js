@@ -22,7 +22,7 @@ const createTables = async () => {
         product_name VARCHAR(100),
         quantity DECIMAL(10,2) DEFAULT 0,
         price DECIMAL(10,2),
-        status VARCHAR(30) DEFAULT 'pending' CHECK (status IN ('pending','in_progress','awaiting_approval','completed','cancelled','delivered','loaded','delivered_and_loaded','money_delivery')),
+        status VARCHAR(30) DEFAULT 'pending' CHECK (status IN ('pending','in_progress','awaiting_approval','completed','cancelled','delivered','loaded','delivered_and_loaded')),
         reminder_time TIMESTAMPTZ,
         completed_at TIMESTAMPTZ,
         created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -64,6 +64,10 @@ const createTables = async () => {
         id SERIAL PRIMARY KEY,
         worker_id INTEGER REFERENCES users(id),
         amount DECIMAL(10,2) NOT NULL,
+        deduction_amount DECIMAL(10,2) DEFAULT 0,
+        deduction_reason TEXT,
+        bonus_amount DECIMAL(10,2) DEFAULT 0,
+        bonus_reason TEXT,
         payment_date DATE DEFAULT CURRENT_DATE,
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
@@ -99,7 +103,7 @@ const createTables = async () => {
 
       CREATE TABLE IF NOT EXISTS profit_log (
         id SERIAL PRIMARY KEY,
-        entry_type VARCHAR(30) NOT NULL CHECK (entry_type IN ('profit','salary_payment','spoilage','expense','revenue','purchase','cogs')),
+        entry_type VARCHAR(30) NOT NULL CHECK (entry_type IN ('profit','salary_payment','spoilage','expense','revenue','purchase','cogs','opening_balance')),
         amount DECIMAL(10,2) NOT NULL,
         description TEXT,
         reference_type VARCHAR(50),
@@ -111,7 +115,7 @@ const createTables = async () => {
       DO $$ BEGIN
         ALTER TABLE profit_log DROP CONSTRAINT IF EXISTS profit_log_entry_type_check;
         ALTER TABLE profit_log ADD CONSTRAINT profit_log_entry_type_check 
-          CHECK (entry_type IN ('profit','salary_payment','spoilage','expense','revenue','purchase','cogs'));
+          CHECK (entry_type IN ('profit','salary_payment','spoilage','expense','revenue','purchase','cogs','opening_balance'));
       END $$;
 
       -- إضافة عمود notes لجدول tasks لو مش موجود
@@ -249,7 +253,7 @@ const createTables = async () => {
     console.log('Tables created successfully');
 
     // إنشاء حساب المشرف الافتراضي
-    const bcrypt = require('bcrypt');
+    const bcrypt = require('bcryptjs');
     const hash = await bcrypt.hash('admin', 10);
     await db.query(
       'INSERT INTO users (username, password_hash, role) VALUES ($1, $2, $3) ON CONFLICT (username) DO NOTHING',

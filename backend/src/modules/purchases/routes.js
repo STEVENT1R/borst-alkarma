@@ -13,7 +13,8 @@ router.get('/', auth, role('supervisor'), async (req, res) => {
           'id', pi.id, 'product_name', pi.product_name,
           'quantity', pi.quantity, 'unit_price', pi.unit_price,
           'total', pi.total
-        )) FROM purchase_items pi WHERE pi.purchase_id = p.id) as items
+        )) FROM purchase_items pi WHERE pi.purchase_id = p.id) as items,
+        (p.total_amount - p.paid_amount) as remaining_amount
       FROM purchases p
       ORDER BY p.purchase_date DESC
       LIMIT 100
@@ -25,10 +26,26 @@ router.get('/', auth, role('supervisor'), async (req, res) => {
   }
 });
 
+// GET /api/purchases/debt - إجمالي المديونية على المشتريات
+router.get('/debt', auth, role('supervisor'), async (req, res) => {
+  try {
+    const result = await db.query(`
+      SELECT 
+        COALESCE(SUM(total_amount - paid_amount), 0) as total_purchase_debt,
+        COUNT(*) FILTER (WHERE payment_status IN ('unpaid', 'partial')) as unpaid_invoices_count
+      FROM purchases
+    `);
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // POST /api/purchases - إضافة فاتورة شراء جديدة
 router.post('/', auth, role('supervisor'), async (req, res) => {
   try {
-    const { supplier_name, items, notes } = req.body;
+    const { supplier_name, items, notes, paid_amount } = req.body;
     
     if (!items || items.length === 0) {
       return res.status(400).json({ error: 'يجب إضافة منتج واحد على الأقل' });
@@ -40,11 +57,20 @@ router.post('/', auth, role('supervisor'), async (req, res) => {
       total_amount += parseFloat(item.unit_price) * parseFloat(item.quantity);
     }
 
+    // حساب المبلغ المدفوع وحالة الدفع
+    const paid = parseFloat(paid_amount) || 0;
+    let payment_status = 'unpaid';
+    if (paid >= total_amount) {
+      payment_status = 'paid';
+    } else if (paid > 0) {
+      payment_status = 'partial';
+    }
+
     // إنشاء الفاتورة
     const purchase = await db.query(
-      `INSERT INTO purchases (supplier_name, total_amount, notes)
-       VALUES ($1, $2, $3) RETURNING *`,
-      [supplier_name || 'مورد', total_amount, notes || null]
+      `INSERT INTO purchases (supplier_name, total_amount, paid_amount, payment_status, notes)
+       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [supplier_name || 'مورد', total_amount, paid, payment_status, notes || null]
     );
     const purchaseId = purchase.rows[0].id;
 
@@ -93,14 +119,76 @@ router.post('/', auth, role('supervisor'), async (req, res) => {
       );
     }
 
+    // تسجيل في سجل الربح (خصم من السيولة حسب المبلغ المدفوع فعلاً)
+    const desc = `فاتورة شراء من ${supplier_name || 'مورد'} - ${items.length} منتج`;
+    if (paid > 0) {
+      await db.query(
+        `INSERT INTO profit_log (entry_type, amount, description, reference_type, reference_id)
+         VALUES ('purchase', $1, $2, 'purchase', $3)`,
+        [paid, desc + ` (مدفوع ${paid} ج.م)`, purchaseId]
+      );
+    }
+    // لو في باقي مديونية، نسجلها كوصف فقط
+
+    res.status(201).json(purchase.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// POST /api/purchases/:id/pay - تسديد فاتورة
+router.post('/:id/pay', auth, role('supervisor'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { amount } = req.body;
+
+    if (!amount || parseFloat(amount) <= 0) {
+      return res.status(400).json({ error: 'المبلغ المطلوب تسديده مطلوب' });
+    }
+
+    // جلب الفاتورة
+    const purchase = await db.query('SELECT * FROM purchases WHERE id = $1', [id]);
+    if (purchase.rows.length === 0) {
+      return res.status(404).json({ error: 'الفاتورة غير موجودة' });
+    }
+
+    const p = purchase.rows[0];
+    const currentPaid = parseFloat(p.paid_amount) || 0;
+    const totalAmount = parseFloat(p.total_amount) || 0;
+    const newPayment = parseFloat(amount);
+    const remaining = totalAmount - currentPaid;
+
+    if (newPayment > remaining) {
+      return res.status(400).json({ error: `المبلغ المطلوب أكبر من المتبقي (${remaining} ج.م)` });
+    }
+
+    const newPaid = currentPaid + newPayment;
+    let newStatus = p.payment_status;
+    if (newPaid >= totalAmount) {
+      newStatus = 'paid';
+    } else {
+      newStatus = 'partial';
+    }
+
+    await db.query(
+      'UPDATE purchases SET paid_amount = $1, payment_status = $2, notes = COALESCE($3, notes) WHERE id = $4',
+      [newPaid, newStatus, null, id]
+    );
+
     // تسجيل في سجل الربح (خصم من السيولة)
     await db.query(
       `INSERT INTO profit_log (entry_type, amount, description, reference_type, reference_id)
        VALUES ('purchase', $1, $2, 'purchase', $3)`,
-      [total_amount, `فاتورة شراء من ${supplier_name || 'مورد'} - ${items.length} منتج`, purchaseId]
+      [newPayment, `تسديد فاتورة شراء من ${p.supplier_name || 'مورد'} - ${newPayment} ج.م`, id]
     );
 
-    res.status(201).json(purchase.rows[0]);
+    res.json({ 
+      message: 'تم تسديد الفاتورة بنجاح', 
+      paid_amount: newPaid, 
+      remaining: totalAmount - newPaid,
+      payment_status: newStatus 
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

@@ -117,7 +117,7 @@ async function startServer() {
       await db.query(`ALTER TABLE profit_log DROP CONSTRAINT IF EXISTS profit_log_entry_type_check`);
     } catch (e) { }
     try {
-      await db.query(`ALTER TABLE profit_log ADD CONSTRAINT profit_log_entry_type_check CHECK (entry_type IN ('revenue','sale_revenue','cogs','purchase','salary_payment','spoilage','expense','profit'))`);
+      await db.query(`ALTER TABLE profit_log ADD CONSTRAINT profit_log_entry_type_check CHECK (entry_type IN ('revenue','sale_revenue','cogs','purchase','salary_payment','spoilage','expense','profit','opening_balance'))`);
     } catch (e) { }
 
     // 7. Expenses table
@@ -209,17 +209,57 @@ async function startServer() {
       )
     `).catch(() => {});
 
-    // 10. Performance log
+    // 10. Performance log - سجل الأداء اليومي
     await db.query(`
       CREATE TABLE IF NOT EXISTS performance_log (
         id SERIAL PRIMARY KEY,
-        user_id INTEGER REFERENCES users(id),
-        task_id INTEGER REFERENCES tasks(id),
-        productivity_score INTEGER DEFAULT 0,
+        record_date DATE NOT NULL UNIQUE DEFAULT CURRENT_DATE,
+        total_income DECIMAL(10,2) DEFAULT 0,
+        total_expenses DECIMAL(10,2) DEFAULT 0,
+        net_profit DECIMAL(10,2) DEFAULT 0,
+        total_tasks INTEGER DEFAULT 0,
+        completed_tasks INTEGER DEFAULT 0,
+        cancelled_tasks INTEGER DEFAULT 0,
+        tasks_completion_rate DECIMAL(5,2) DEFAULT 0,
+        tasks_value DECIMAL(10,2) DEFAULT 0,
+        active_workers INTEGER DEFAULT 0,
+        avg_tasks_per_worker DECIMAL(10,2) DEFAULT 0,
+        inventory_value DECIMAL(10,2) DEFAULT 0,
+        low_stock_count INTEGER DEFAULT 0,
+        spoilage_cost DECIMAL(10,2) DEFAULT 0,
+        total_debts DECIMAL(10,2) DEFAULT 0,
+        collected_amount DECIMAL(10,2) DEFAULT 0,
+        current_liquidity DECIMAL(10,2) DEFAULT 0,
+        efficiency_score DECIMAL(5,2) DEFAULT 0,
         notes TEXT,
         created_at TIMESTAMPTZ DEFAULT NOW()
       )
     `).catch(() => {});
+    // إضافة الأعمدة المفقودة بأمان للتحديثات
+    const perfCols = [
+      'ADD COLUMN IF NOT EXISTS record_date DATE NOT NULL UNIQUE DEFAULT CURRENT_DATE',
+      'ADD COLUMN IF NOT EXISTS total_income DECIMAL(10,2) DEFAULT 0',
+      'ADD COLUMN IF NOT EXISTS total_expenses DECIMAL(10,2) DEFAULT 0',
+      'ADD COLUMN IF NOT EXISTS net_profit DECIMAL(10,2) DEFAULT 0',
+      'ADD COLUMN IF NOT EXISTS total_tasks INTEGER DEFAULT 0',
+      'ADD COLUMN IF NOT EXISTS completed_tasks INTEGER DEFAULT 0',
+      'ADD COLUMN IF NOT EXISTS cancelled_tasks INTEGER DEFAULT 0',
+      'ADD COLUMN IF NOT EXISTS tasks_completion_rate DECIMAL(5,2) DEFAULT 0',
+      'ADD COLUMN IF NOT EXISTS tasks_value DECIMAL(10,2) DEFAULT 0',
+      'ADD COLUMN IF NOT EXISTS active_workers INTEGER DEFAULT 0',
+      'ADD COLUMN IF NOT EXISTS avg_tasks_per_worker DECIMAL(10,2) DEFAULT 0',
+      'ADD COLUMN IF NOT EXISTS inventory_value DECIMAL(10,2) DEFAULT 0',
+      'ADD COLUMN IF NOT EXISTS low_stock_count INTEGER DEFAULT 0',
+      'ADD COLUMN IF NOT EXISTS spoilage_cost DECIMAL(10,2) DEFAULT 0',
+      'ADD COLUMN IF NOT EXISTS total_debts DECIMAL(10,2) DEFAULT 0',
+      'ADD COLUMN IF NOT EXISTS collected_amount DECIMAL(10,2) DEFAULT 0',
+      'ADD COLUMN IF NOT EXISTS current_liquidity DECIMAL(10,2) DEFAULT 0',
+      'ADD COLUMN IF NOT EXISTS efficiency_score DECIMAL(5,2) DEFAULT 0',
+    ];
+    for (const col of perfCols) {
+      await db.query(`ALTER TABLE performance_log ${col}`).catch(() => {});
+    }
+
 
     // 11. Receivers table - المستلمين
     await db.query(`
@@ -253,11 +293,18 @@ async function startServer() {
         id SERIAL PRIMARY KEY,
         supplier_name VARCHAR(200) NOT NULL,
         total_amount DECIMAL(10,2) NOT NULL,
+        paid_amount DECIMAL(10,2) DEFAULT 0,
+        payment_status VARCHAR(20) DEFAULT 'unpaid' CHECK (payment_status IN ('paid','partial','unpaid')),
         notes TEXT,
         purchase_date TIMESTAMPTZ DEFAULT NOW(),
         created_at TIMESTAMPTZ DEFAULT NOW()
       )
     `).catch(() => {});
+    // إضافة الأعمدة الجديدة للفواتير القديمة
+    await db.query(`ALTER TABLE purchases ADD COLUMN IF NOT EXISTS paid_amount DECIMAL(10,2) DEFAULT 0`).catch(() => {});
+    await db.query(`ALTER TABLE purchases ADD COLUMN IF NOT EXISTS payment_status VARCHAR(20) DEFAULT 'unpaid'`).catch(() => {});
+    await db.query(`ALTER TABLE purchases DROP CONSTRAINT IF EXISTS purchases_payment_status_check`).catch(() => {});
+    await db.query(`ALTER TABLE purchases ADD CONSTRAINT purchases_payment_status_check CHECK (payment_status IN ('paid','partial','unpaid'))`).catch(() => {});
 
     // 14. Purchase items table - عناصر المشتريات
     await db.query(`

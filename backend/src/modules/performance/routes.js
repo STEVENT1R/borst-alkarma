@@ -317,4 +317,233 @@ router.delete('/log/:id', auth, role('supervisor'), async (req, res) => {
   }
 });
 
+// GET /api/performance/period - تقرير أداء الفترة (جرد)
+router.get('/period', auth, role('supervisor'), async (req, res) => {
+  try {
+    const { start_date, end_date } = req.query;
+
+    if (!start_date || !end_date) {
+      return res.status(400).json({ error: 'يجب إدخال تاريخ البداية والنهاية' });
+    }
+
+    // حساب مؤشرات الفترة المالية
+    const financial = await db.query(`
+      SELECT
+        -- إجمالي الدخل = الإيرادات + الربح اليدوي + مبيعات
+        COALESCE(SUM(CASE WHEN entry_type IN ('revenue', 'profit', 'sale_revenue') THEN amount ELSE 0 END), 0) as total_income,
+        -- المصروفات
+        COALESCE(SUM(CASE WHEN entry_type = 'expense' THEN amount ELSE 0 END), 0) as expenses,
+        -- المرتبات
+        COALESCE(SUM(CASE WHEN entry_type = 'salary_payment' THEN amount ELSE 0 END), 0) as salaries,
+        -- الهالك
+        COALESCE(SUM(CASE WHEN entry_type = 'spoilage' THEN amount ELSE 0 END), 0) as spoilage_cost,
+        -- تكلفة البضاعة المباعة
+        COALESCE(SUM(CASE WHEN entry_type = 'cogs' THEN amount ELSE 0 END), 0) as cogs,
+        -- المشتريات
+        COALESCE(SUM(CASE WHEN entry_type = 'purchase' THEN amount ELSE 0 END), 0) as purchase_cost,
+        -- إجمالي الخسائر = المصروفات + المرتبات + الهالك + المشتريات
+        COALESCE(SUM(CASE WHEN entry_type IN ('expense', 'salary_payment', 'spoilage', 'purchase') THEN amount ELSE 0 END), 0) as total_losses,
+        -- صافي الإيراد = إجمالي الدخل - المصروفات - المرتبات - الهالك
+        COALESCE(SUM(
+          CASE 
+            WHEN entry_type IN ('revenue', 'profit', 'sale_revenue') THEN amount
+            WHEN entry_type IN ('expense', 'salary_payment', 'spoilage') THEN -amount
+            ELSE 0
+          END
+        ), 0) as net_revenue,
+        -- صافي الربح = إجمالي الدخل - cogs - المصروفات - المرتبات - الهالك
+        COALESCE(SUM(
+          CASE 
+            WHEN entry_type IN ('revenue', 'profit', 'sale_revenue') THEN amount
+            WHEN entry_type IN ('cogs', 'expense', 'salary_payment', 'spoilage') THEN -amount
+            ELSE 0
+          END
+        ), 0) as net_profit
+      FROM profit_log
+      WHERE created_at::date >= $1 AND created_at::date <= $2
+        AND entry_type != 'opening_balance'
+    `, [start_date, end_date]);
+
+
+
+    // حساب تغير النقدية = السيولة في نهاية الفترة - السيولة في بداية الفترة
+    // الرصيد التراكمي قبل بداية الفترة
+    const liquidityBefore = await db.query(`
+      SELECT COALESCE(SUM(
+        CASE 
+          WHEN entry_type IN ('revenue', 'profit', 'sale_revenue', 'opening_balance') THEN amount
+          WHEN entry_type IN ('salary_payment', 'spoilage', 'expense', 'purchase') THEN -amount
+          ELSE 0
+        END
+      ), 0) as liquidity_before
+      FROM profit_log
+      WHERE created_at::date < $1
+    `, [start_date]);
+
+    // الرصيد التراكمي في نهاية الفترة
+    const liquidityAfter = await db.query(`
+      SELECT COALESCE(SUM(
+        CASE 
+          WHEN entry_type IN ('revenue', 'profit', 'sale_revenue', 'opening_balance') THEN amount
+          WHEN entry_type IN ('salary_payment', 'spoilage', 'expense', 'purchase') THEN -amount
+          ELSE 0
+        END
+      ), 0) as liquidity_after
+      FROM profit_log
+      WHERE created_at::date <= $1
+    `, [end_date]);
+
+
+    const beforeVal = parseFloat(liquidityBefore.rows[0].liquidity_before) || 0;
+    const afterVal = parseFloat(liquidityAfter.rows[0].liquidity_after) || 0;
+    const liquidityChange = afterVal - beforeVal;
+
+    // المخزون: قبل وبعد الفترة
+    // أولاً: المخزون الحالي (نهاية الفترة)
+    const inventoryAfter = await db.query(`
+      SELECT
+        COALESCE(SUM(quantity * purchase_price), 0) as inventory_value,
+        COUNT(*) as total_products,
+        COUNT(*) FILTER (WHERE quantity < 5) as low_stock_count
+      FROM inventory
+    `);
+
+    // ثانياً: حساب تغيرات المخزون خلال الفترة (لحساب قيمة بداية الفترة)
+    const invChanges = await db.query(`
+      SELECT
+        COALESCE(SUM(
+          CASE WHEN it.transaction_type = 'addition' 
+               THEN it.quantity_change * inv.purchase_price 
+               ELSE 0 END
+        ), 0) as value_added,
+        COALESCE(SUM(
+          CASE WHEN it.transaction_type IN ('sale', 'deduction', 'spoilage', 'adjustment') 
+               THEN ABS(it.quantity_change) * inv.purchase_price 
+               ELSE 0 END
+        ), 0) as value_removed,
+        COUNT(DISTINCT it.product_name) as products_changed
+      FROM inventory_transactions it
+      JOIN inventory inv ON it.product_name = inv.product_name
+      WHERE it.created_at::date >= $1 AND it.created_at::date <= $2
+    `, [start_date, end_date]);
+
+    // قيمة المخزون أول الفترة = قيمة المخزون الحالي - الإضافات + المسحوبات
+    const invAfterRow = inventoryAfter.rows[0];
+    const invChangeRow = invChanges.rows[0];
+    const valueAdded = parseFloat(invChangeRow.value_added) || 0;
+    const valueRemoved = parseFloat(invChangeRow.value_removed) || 0;
+    const invValueAfter = parseFloat(invAfterRow.inventory_value) || 0;
+    const invValueBefore = invValueAfter - valueAdded + valueRemoved;
+    const productsAfter = parseInt(invAfterRow.total_products) || 0;
+    const lowStock = parseInt(invAfterRow.low_stock_count) || 0;
+    // تقدير عدد المنتجات أول الفترة
+    const productsChanged = parseInt(invChangeRow.products_changed) || 0;
+    const productsBefore = productsAfter + (productsChanged > 0 ? Math.round(productsChanged * 0.5) : 0);
+
+
+    // مهام الفترة
+    const tasks = await db.query(`
+      SELECT
+        COUNT(*) as total_tasks,
+        COUNT(*) FILTER (WHERE status IN ('completed','delivered','loaded','delivered_and_loaded')) as completed_tasks,
+        COUNT(*) FILTER (WHERE status = 'cancelled') as cancelled_tasks,
+        COALESCE(SUM(price) FILTER (WHERE status IN ('completed','delivered','loaded','delivered_and_loaded')), 0) as tasks_value
+      FROM tasks
+      WHERE created_at::date >= $1 AND created_at::date <= $2
+    `, [start_date, end_date]);
+
+    // عدد العمال النشطاء
+    const workers = await db.query(`
+      SELECT
+        COUNT(DISTINCT worker_id) as active_workers
+      FROM tasks
+      WHERE created_at::date >= $1 AND created_at::date <= $2
+        AND worker_id IS NOT NULL
+    `, [start_date, end_date]);
+
+    const f = financial.rows[0];
+    const t = tasks.rows[0];
+    const w = workers.rows[0];
+
+    // الديون: ما لنا عند الناس (مديونيات المستلمين) للفترة
+    const receiverDebtRes = await db.query(`
+      SELECT
+        COALESCE(SUM(amount) FILTER (WHERE transaction_type IN ('goods_delivered','debt_added','manual_addition')), 0) as total_owed_to_us,
+        COALESCE(SUM(amount) FILTER (WHERE transaction_type IN ('money_received','money_collected','manual_deduction')), 0) as total_collected
+      FROM receiver_transactions
+      WHERE created_at::date >= $1 AND created_at::date <= $2
+    `, [start_date, end_date]);
+
+    // ما علينا للموردين (المديونية على المشتريات)
+    const purchaseDebtRes = await db.query(`
+      SELECT
+        COALESCE(SUM(total_amount - paid_amount), 0) as remaining_debt,
+        COUNT(*) FILTER (WHERE payment_status IN ('unpaid', 'partial')) as unpaid_invoices
+      FROM purchases
+      WHERE purchase_date::date >= $1 AND purchase_date::date <= $2
+    `, [start_date, end_date]);
+
+    const rd = receiverDebtRes.rows[0];
+    const pd = purchaseDebtRes.rows[0];
+
+    res.json({
+      period: { start_date, end_date },
+      financial: {
+        net_revenue: parseFloat(f.net_revenue || 0).toFixed(1),
+        net_profit: parseFloat(f.net_profit || 0).toFixed(1),
+        total_income: parseFloat(f.total_income || 0).toFixed(1),
+        total_expenses: parseFloat(f.total_expenses || 0).toFixed(1),
+        spoilage_cost: parseFloat(f.spoilage_cost || 0).toFixed(1),
+        purchase_cost: parseFloat(f.purchase_cost || 0).toFixed(1),
+        total_losses: parseFloat(f.total_losses || 0).toFixed(1),
+        expenses: parseFloat(f.expenses || 0).toFixed(1),
+        salaries: parseFloat(f.salaries || 0).toFixed(1),
+        spoilage: parseFloat(f.spoilage_cost || 0).toFixed(1),
+        cogs: parseFloat(f.cogs || 0).toFixed(1),
+      },
+
+      liquidity: {
+        before: beforeVal.toFixed(1),
+        after: afterVal.toFixed(1),
+        change: liquidityChange.toFixed(1),
+        change_type: liquidityChange >= 0 ? 'increase' : 'decrease',
+      },
+      inventory: {
+        before: {
+          value: Math.max(0, invValueBefore).toFixed(1),
+          total_products: Math.max(0, productsBefore),
+        },
+        after: {
+          value: invValueAfter.toFixed(1),
+          total_products: productsAfter,
+        },
+        low_stock_count: lowStock,
+      },
+      debts: {
+        // لينا عند الناس (المستلمين مديونين لنا)
+        owed_to_us: parseFloat(rd.total_owed_to_us || 0).toFixed(1),
+        collected: parseFloat(rd.total_collected || 0).toFixed(1),
+        net_receivable: (parseFloat(rd.total_owed_to_us || 0) - parseFloat(rd.total_collected || 0)).toFixed(1),
+        // علينا للموردين (مديونية المشتريات)
+        purchase_debt: parseFloat(pd.remaining_debt || 0).toFixed(1),
+        unpaid_invoices: parseInt(pd.unpaid_invoices) || 0,
+      },
+      tasks: {
+        total: parseInt(t.total_tasks) || 0,
+        completed: parseInt(t.completed_tasks) || 0,
+        cancelled: parseInt(t.cancelled_tasks) || 0,
+        value: parseFloat(t.tasks_value || 0).toFixed(1),
+        completion_rate: (parseInt(t.total_tasks) > 0
+          ? Math.round((parseInt(t.completed_tasks) / parseInt(t.total_tasks)) * 100)
+          : 0),
+      },
+      active_workers: parseInt(w.active_workers) || 0,
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'خطأ في الخادم' });
+  }
+});
+
 module.exports = router;

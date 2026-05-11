@@ -21,10 +21,18 @@ router.post('/', auth, role('supervisor'), async (req, res) => {
 // POST /api/salaries/pay - إيداع المرتب
 router.post('/pay', auth, role('supervisor'), async (req, res) => {
   try {
-    const { worker_id, amount } = req.body;
+    const { worker_id, amount, deduction_amount, deduction_reason, bonus_amount, bonus_reason } = req.body;
+
+    // إضافة الأعمدة الجديدة لو مش موجودة (تحديث آمن)
+    await db.query(`ALTER TABLE salary_payments ADD COLUMN IF NOT EXISTS deduction_amount DECIMAL(10,2) DEFAULT 0`).catch(() => {});
+    await db.query(`ALTER TABLE salary_payments ADD COLUMN IF NOT EXISTS deduction_reason TEXT`).catch(() => {});
+    await db.query(`ALTER TABLE salary_payments ADD COLUMN IF NOT EXISTS bonus_amount DECIMAL(10,2) DEFAULT 0`).catch(() => {});
+    await db.query(`ALTER TABLE salary_payments ADD COLUMN IF NOT EXISTS bonus_reason TEXT`).catch(() => {});
+
     const result = await db.query(
-      'INSERT INTO salary_payments (worker_id, amount) VALUES ($1, $2) RETURNING *',
-      [worker_id, amount]
+      `INSERT INTO salary_payments (worker_id, amount, deduction_amount, deduction_reason, bonus_amount, bonus_reason) 
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [worker_id, amount, parseFloat(deduction_amount || 0) || 0, deduction_reason || null, parseFloat(bonus_amount || 0) || 0, bonus_reason || null]
     );
 
     // تسجيل في سجل الربح كمصروف
