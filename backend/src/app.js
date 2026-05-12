@@ -6,6 +6,11 @@ require('dotenv').config();
 
 const path = require('path');
 const errorHandler = require('./middleware/errorHandler');
+const initDatabase = require('../api/init');
+
+// Track DB initialization state
+let dbInitialized = false;
+let dbInitPromise = null;
 
 const authRoutes = require('./modules/auth/routes');
 const taskRoutes = require('./modules/tasks/routes');
@@ -61,6 +66,28 @@ app.options('*', cors(corsOptions));
 app.use(helmet());
 
 app.use(express.json({ limit: '10mb' }));
+
+// Database initialization middleware (runs once on first request)
+app.use(async (req, res, next) => {
+  if (!dbInitialized) {
+    if (!dbInitPromise) {
+      dbInitPromise = initDatabase().then(() => {
+        dbInitialized = true;
+        console.log('✅ Database ready for requests');
+      });
+    }
+    try {
+      await dbInitPromise;
+    } catch (err) {
+      console.error('❌ Database init failed:', err.message);
+      if (!res.headersSent) {
+        return res.status(503).json({ error: 'Database initialization failed. Please try again.' });
+      }
+      return;
+    }
+  }
+  next();
+});
 
 // Serve static files from the frontend build folder (only locally, not on Vercel)
 const frontendDist = path.join(__dirname, '../../frontend/dist');
