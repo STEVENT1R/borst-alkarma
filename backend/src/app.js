@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const fs = require('fs');
 require('dotenv').config();
 
 const path = require('path');
@@ -50,8 +51,12 @@ app.use(cors({
 
 app.use(express.json({ limit: '10mb' }));
 
-// Serve static files from the frontend build folder (React build)
-app.use(express.static(path.join(__dirname, '../../frontend/dist')));
+// Serve static files from the frontend build folder (only locally, not on Vercel)
+const frontendDist = path.join(__dirname, '../../frontend/dist');
+if (fs.existsSync(frontendDist)) {
+  app.use(express.static(frontendDist));
+  console.log('✅ Serving frontend static files from frontend/dist');
+}
 
 app.use('/api/users', userRoutes);
 
@@ -81,9 +86,11 @@ app.get('/', (req, res) => {
 // Centralized error handler (must be last middleware)
 app.use(errorHandler);
 
-// For any route not matching an API endpoint, return the React app
-app.use((req, res) => {
-  res.sendFile(path.join(__dirname, '../../frontend/dist/index.html'));
-});
+// For any route not matching an API endpoint, return the React app (only locally)
+if (fs.existsSync(frontendDist)) {
+  app.use((req, res) => {
+    res.sendFile(path.join(frontendDist, 'index.html'));
+  });
+}
 
 module.exports = app;
