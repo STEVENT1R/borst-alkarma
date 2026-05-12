@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 require('dotenv').config();
 
 const path = require('path');
@@ -21,11 +22,33 @@ const settingsRoutes = require('./modules/settings/routes');
 const pushRoutes = require('./modules/push/routes');
 const shopsRoutes = require('./modules/shops/routes');
 const salesRoutes = require('./modules/sales/routes');
+const workersLoadRoutes = require('./modules/workers_load/routes');
 
 const app = express();
 
-app.use(cors());
-app.use(express.json());
+
+// Security headers
+app.use(helmet());
+
+// CORS - restrict to known origins in production
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',')
+  : ['http://localhost:5173', 'http://localhost:3000', 'https://borstalkarma.vercel.app'];
+
+app.use(cors({
+  origin: function (origin, callback) {
+    // Allow requests with no origin (server-to-server, mobile apps, curl)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV === 'development') {
+      callback(null, true);
+    } else {
+      callback(new Error(`Origin ${origin} not allowed by CORS`));
+    }
+  },
+  credentials: true
+}));
+
+app.use(express.json({ limit: '10mb' }));
 
 // Serve static files from the public folder (React build)
 app.use(express.static(path.join(__dirname, '../../public')));
@@ -47,8 +70,10 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/push', pushRoutes);
 app.use('/api/shops', shopsRoutes);
 app.use('/api/sales', salesRoutes);
+app.use('/api/workers-load', workersLoadRoutes);
 
 app.get('/', (req, res) => {
+
 
   res.send('ERP API is running...');
 });

@@ -138,7 +138,7 @@ const ShopsLog = () => {
           </div>
         ) : (
           <div className="space-y-3">
-            {filteredShops.map(shop => (
+            {[...filteredShops].sort((a, b) => (a.shop_name || a.username)?.localeCompare(b.shop_name || b.username, 'ar')).map(shop => (
               <button
                 key={shop.id}
                 onClick={() => handleSelectShop(shop)}

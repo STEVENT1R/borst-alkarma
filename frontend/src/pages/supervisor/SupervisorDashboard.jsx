@@ -101,9 +101,9 @@ const SupervisorDashboard = () => {
             {parseFloat(net_profit_today || 0).toFixed(1)} ج.م
           </div>
           <div className="flex flex-wrap items-center gap-3 mt-2 text-xs text-gray-500">
-            <span>صافي الربح: {parseFloat(net_profit_today || 0).toFixed(1)}</span>
           </div>
         </div>
+
       </div>
 
       {/* ===== تفاصيل اليوم المصغرة ===== */}

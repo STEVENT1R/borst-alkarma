@@ -84,8 +84,8 @@ router.post('/', auth, role('supervisor'), async (req, res) => {
   }
 });
 
-// PATCH / PUT تحديث منتج
-router.patch('/:id', auth, role('supervisor'), async (req, res) => {
+// PATCH / PUT تحديث منتج (يدعم PUT و PATCH من خلال route واحد)
+const updateInventoryItem = async (req, res) => {
   try {
     const { id } = req.params;
     const fields = [];
@@ -109,34 +109,11 @@ router.patch('/:id', auth, role('supervisor'), async (req, res) => {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
-});
+};
 
-// PUT also works for updates (frontend uses .put)
-router.put('/:id', auth, role('supervisor'), async (req, res) => {
-  try {
-    const { id } = req.params;
-    const fields = [];
-    const values = [];
-    let idx = 1;
-    for (const [key, val] of Object.entries(req.body)) {
-      const dbKey = key === 'min_stock_level' ? 'min_stock_level' : key;
-      fields.push(`${dbKey} = $${idx++}`);
-      values.push(val);
-    }
-    if (fields.length === 0) return res.status(400).json({ error: 'No fields to update' });
-    fields.push(`updated_at = NOW()`);
-    values.push(id);
-    const result = await db.query(
-      `UPDATE inventory SET ${fields.join(', ')} WHERE id = $${idx} RETURNING *`,
-      values
-    );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Not found' });
-    res.json(result.rows[0]);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
+router.patch('/:id', auth, role('supervisor'), updateInventoryItem);
+router.put('/:id', auth, role('supervisor'), updateInventoryItem);
+
 
 // DELETE حذف منتج
 router.delete('/:id', auth, role('supervisor'), async (req, res) => {
@@ -247,8 +224,10 @@ router.post('/spoilage', auth, role('supervisor'), async (req, res) => {
 
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: err.message || 'خطأ في الخادم' });
+    res.status(500).json({ error: 'خطأ في الخادم' });
   }
 });
 
 module.exports = router;
+
+

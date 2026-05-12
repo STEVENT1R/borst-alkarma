@@ -154,7 +154,7 @@ const SalaryManagement = () => {
         </div>
       ) : (
         <div className="grid gap-2">
-          {workers.map((w) => (
+          {[...workers].sort((a, b) => a.username?.localeCompare(b.username, 'ar')).map((w) => (
             <div key={w.worker_id} className="bg-white p-4 rounded-2xl shadow-sm border">
               <div className="flex justify-between items-center cursor-pointer hover:bg-gray-50 p-2 -m-2 rounded-xl" onClick={() => openEditor(w)}>
                 <div>

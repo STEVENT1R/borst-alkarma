@@ -65,6 +65,12 @@ self.addEventListener('fetch', (event) => {
   }
   // للطلبات التانية (assets, images, etc.) - استراتيجية Network First
   else {
+    // بس خزن الـ GET requests (مش POST عشان الـ Service Worker ميكراش)
+    if (event.request.method !== 'GET') {
+      // مرر الطلب منغير تخزين
+      event.respondWith(fetch(event.request).catch(() => new Response('Error', { status: 503 })));
+      return;
+    }
     event.respondWith(
       fetch(event.request)
         .then((response) => {
@@ -81,6 +87,7 @@ self.addEventListener('fetch', (event) => {
         })
     );
   }
+
 });
 
 // ---- Push Notification Handlers ----

@@ -226,7 +226,7 @@ const PurchasesLog = () => {
           </button>
 
           <datalist id="product-suggestions">
-            {purchases.flatMap(p => p.items || []).map((item, i) => (
+            {[...new Map(purchases.flatMap(p => p.items || []).map(item => [item.product_name, item])).values()].sort((a, b) => a.product_name?.localeCompare(b.product_name, 'ar')).map((item, i) => (
               <option key={i} value={item.product_name} />
             ))}
           </datalist>

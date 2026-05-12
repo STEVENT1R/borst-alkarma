@@ -159,6 +159,16 @@ const createTables = async () => {
         END IF;
       END $$;
 
+      -- إضافة عمود cancellation_reason لجدول tasks لو مش موجود
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'tasks' AND column_name = 'cancellation_reason'
+        ) THEN
+          ALTER TABLE tasks ADD COLUMN cancellation_reason TEXT;
+        END IF;
+      END $$;
+
       -- إضافة عمود address لجدول receivers لو مش موجود
       DO $$ BEGIN
         IF NOT EXISTS (
@@ -249,8 +259,57 @@ const createTables = async () => {
       -- إدراج الإعدادات الافتراضية
       INSERT INTO app_settings (key, value) VALUES ('cleanup_months', '6')
         ON CONFLICT (key) DO NOTHING;
+      -- إضافة عمود cash_balance لجدول users لو مش موجود
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'users' AND column_name = 'cash_balance'
+        ) THEN
+          ALTER TABLE users ADD COLUMN cash_balance DECIMAL(10,2) DEFAULT 0;
+        END IF;
+      END $$;
+
+      -- جدول حمولة العمال (المنتجات اللي شايلينها)
+      CREATE TABLE IF NOT EXISTS worker_load (
+        id SERIAL PRIMARY KEY,
+        worker_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        product_name VARCHAR(100) NOT NULL,
+        quantity DECIMAL(10,2) NOT NULL DEFAULT 0,
+        unit_type VARCHAR(20) DEFAULT 'unit' CHECK (unit_type IN ('unit','weight')),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      -- سجل العهدة المالية للعامل
+      CREATE TABLE IF NOT EXISTS worker_cash_custody (
+        id SERIAL PRIMARY KEY,
+        worker_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        amount DECIMAL(10,2) NOT NULL,
+        type VARCHAR(30) NOT NULL CHECK (type IN ('received_from_supervisor','collected_from_tasks','returned_to_supervisor','sent_to_supervisor')),
+        description TEXT,
+        reference_type VARCHAR(50),
+        reference_id INTEGER,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      -- سجل تحركات العهد اليومية (بداية اليوم / نهاية اليوم)
+      CREATE TABLE IF NOT EXISTS worker_daily_log (
+        id SERIAL PRIMARY KEY,
+        worker_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        log_date DATE NOT NULL DEFAULT CURRENT_DATE,
+        status VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active','ended')),
+        started_at TIMESTAMPTZ DEFAULT NOW(),
+        ended_at TIMESTAMPTZ,
+        start_snapshot JSONB, -- لقطة لبداية اليوم (المنتجات + الرصيد)
+        end_snapshot JSONB,   -- لقطة لنهاية اليوم (المنتجات + الرصيد + الإيرادات)
+        summary TEXT,         -- ملخص نصي لليوم
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(worker_id, log_date)
+      );
     `);
+
     console.log('Tables created successfully');
+
 
     // إنشاء حساب المشرف الافتراضي
     const bcrypt = require('bcryptjs');

@@ -1,12 +1,23 @@
 const express = require('express');
 const router = express.Router();
+const rateLimit = require('express-rate-limit');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('../../config/db');
 const authMiddleware = require('../../middleware/auth');
 const roleMiddleware = require('../../middleware/role');
 
+// Rate limiting على محاولات تسجيل الدخول (حد أقصى 10 محاولات كل 15 دقيقة)
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { error: 'محاولات تسجيل دخول كثيرة جداً. الرجاء الانتظار 15 دقيقة' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // POST /api/auth/create-user (المشرف فقط هو اللي يقدر يعمل حسابات)
+
 router.post('/create-user', authMiddleware, roleMiddleware('supervisor'), async (req, res) => {
   try {
     const { username, password, account_type } = req.body;
@@ -53,7 +64,8 @@ router.post('/create-user', authMiddleware, roleMiddleware('supervisor'), async 
 });
 
 // POST /api/auth/login
-router.post('/login', async (req, res) => {
+router.post('/login', loginLimiter, async (req, res) => {
+
   try {
     const { username, password } = req.body;
 

@@ -175,7 +175,7 @@ const Inventory = () => {
       </form>
 
       <div className="space-y-2">
-        {products.map(p => {
+        {[...products].sort((a, b) => a.product_name?.localeCompare(b.product_name, 'ar')).map(p => {
           const qty = parseFloat(p.quantity);
           const minStock = parseFloat(p.min_stock_level || 5);
           const isLow = qty < minStock;

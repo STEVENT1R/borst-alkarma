@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "697583905371",
+    "project_id": "borst-alkarma",
+    "storage_bucket": "borst-alkarma.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:697583905371:android:0812f4cfe3baac69f9ad7e",
+        "android_client_info": {
+          "package_name": "com.borstalkarma.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDCs0xkAtxtlJlCxJZlOgCL8-SQfXjseVs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:697583905371:android:dbfa3315fdcd27e2f9ad7e",
+        "android_client_info": {
+          "package_name": "com.borstelkarma.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDCs0xkAtxtlJlCxJZlOgCL8-SQfXjseVs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

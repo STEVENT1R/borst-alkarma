@@ -113,7 +113,7 @@ const PerformanceReport = () => {
         <p className="text-gray-400 text-center py-4">لا يوجد عمال</p>
       ) : (
         <div className="space-y-3 mb-6">
-          {workers.map(w => {
+          {[...workers].sort((a, b) => a.username?.localeCompare(b.username, 'ar')).map(w => {
             const rate = w.total_tasks > 0 ? Math.round((w.completed_tasks / w.total_tasks) * 100) : 0;
             return (
               <div key={w.id} className="bg-white p-4 rounded-2xl shadow-sm border">

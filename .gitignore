@@ -4,16 +4,8 @@ frontend/dist/
 *.log
 .DS_Store
 .vscode/
-task-progress.md
 e
-render.yaml
-backend/Procfile
+nul
 ssh-key-*.key
 ssh-key-*.key.pub
-
-# Local Netlify folder
-.netlify
-
-.vercel
-"backend/src/config/firebase.json"  
-nul  
+backend/src/config/firebase.json

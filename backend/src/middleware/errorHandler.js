@@ -8,12 +8,15 @@ const errorHandler = (err, req, res, _next) => {
   // Already handled / custom status
   if (res.statusCode && res.statusCode !== 200) {
     return res.status(res.statusCode).json({
-      error: err.message || 'حدث خطأ',
+      error: process.env.NODE_ENV === 'production' ? 'حدث خطأ' : (err.message || 'حدث خطأ'),
     });
   }
 
   const status = err.status || 500;
-  const message = err.message || 'خطأ داخلي في الخادم';
+  // لا تسريب لتفاصيل الخطأ الداخلية في الإنتاج
+  const message = process.env.NODE_ENV === 'production'
+    ? 'خطأ داخلي في الخادم'
+    : (err.message || 'خطأ داخلي في الخادم');
 
   res.status(status).json({ error: message });
 };

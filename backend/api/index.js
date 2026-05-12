@@ -1,10 +1,8 @@
 /**
  * Vercel Serverless Entry Point
  * Import the Express app and export it as a serverless function
- * Ensures database is initialized BEFORE processing any request
  */
-
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
 
 const app = require('../src/app');
 const initDatabase = require('./init');
@@ -31,5 +29,4 @@ app.use(async (req, res, next) => {
   next();
 });
 
-// Vercel serverless export
 module.exports = app;

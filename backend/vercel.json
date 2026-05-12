@@ -8,18 +8,8 @@
   ],
   "routes": [
     {
-      "src": "/api/(.*)",
-      "dest": "api/index.js"
-    },
-    {
       "src": "/(.*)",
       "dest": "api/index.js"
     }
-  ],
-  "env": {
-    "DATABASE_URL": "postgresql://neondb_owner:npg_eopqIvmALC25@ep-twilight-brook-an0yxcrt.c-6.us-east-1.aws.neon.tech/neondb?sslmode=require",
-    "JWT_SECRET": "borst_alkarma_secret_key_2024",
-    "VAPID_PUBLIC_KEY": "BEJZ0VW5Fc3NsMPSUUjQFYohT-5HlpDNq93SC3M5Ubwx1tY5Jcdwx5NcShegINlz7WHbc-jvzLrR1c1ng-UxBM4",
-    "VAPID_PRIVATE_KEY": "sftnDOP6dZJvLd8vjb86wY0DDDAUrd96wVNmGwkNQrE"
-  }
+  ]
 }

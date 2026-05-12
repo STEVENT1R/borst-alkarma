@@ -233,7 +233,7 @@ const CashierInventory = () => {
             <p className="text-gray-400">{search ? 'لا توجد منتجات مطابقة' : 'المخزن فارغ'}</p>
           </div>
         ) : (
-          filtered.map(product => (
+          [...filtered].sort((a, b) => a.product_name?.localeCompare(b.product_name, 'ar')).map(product => (
             <div key={product.id} className="bg-white p-3 rounded-xl border">
               <div className="flex items-center justify-between mb-2">
                 <span className="font-bold text-lg">{product.product_name}</span>

@@ -16,12 +16,15 @@ import SalaryLog from './SalaryLog';
 import ReceiversLog from './ReceiversLog';
 import ProfitLog from './ProfitLog';
 import PerformanceLog from './PerformanceLog';
-import CashFlowLog from './CashFlowLog';
 import PurchasesLog from './PurchasesLog';
 import PerformanceReport from './PerformanceReport';
 import ShopsLog from './ShopsLog';
+import WorkerDailyLogs from './WorkerDailyLogs';
+import WorkerLoadManagement from './WorkerLoadManagement';
+import WorkerAdmin from './WorkerAdmin';
 
 const SupervisorLayout = () => (
+
   <div className="h-screen flex flex-col">
     <TopBar />
     <div className="flex-1 overflow-y-auto pb-20">
@@ -42,11 +45,14 @@ const SupervisorLayout = () => (
         <Route path="receivers-log" element={<ReceiversLog />} />
         <Route path="profit-log" element={<ProfitLog />} />
         <Route path="performance-log" element={<PerformanceLog />} />
-        <Route path="cashflow-log" element={<CashFlowLog />} />
         <Route path="purchases-log" element={<PurchasesLog />} />
         <Route path="performance-report" element={<PerformanceReport />} />
         <Route path="shops-log" element={<ShopsLog />} />
+        <Route path="worker-daily-logs" element={<WorkerDailyLogs />} />
+        <Route path="worker-load/:workerId" element={<WorkerLoadManagement />} />
+        <Route path="worker-admin/:workerId" element={<WorkerAdmin />} />
         </Routes>
+
 
       </div>
     </div>

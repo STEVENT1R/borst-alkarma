@@ -41,13 +41,17 @@ const BottomNav = () => {
 
   return (
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 pb-2 pt-1">
-        <div className="grid grid-cols-4 w-full">
+        <div className="grid grid-cols-6 w-full">
           <NavButton icon={<Home size={20} />} label="الرئيسية" active={isActive('/worker')} onClick={() => navigate('/worker')} />
+          <NavButton icon={<PlusCircle size={20} />} label="إضافة مهمه" active={isActive('/worker/create-task')} onClick={() => navigate('/worker/create-task')} />
           <NavButton icon={<List size={20} />} label="المهام" active={isActive('/worker/tasks')} onClick={() => navigate('/worker/tasks')} />
+          <NavButton icon={<Package size={20} />} label="العهدة" active={isActive('/worker/load')} onClick={() => navigate('/worker/load')} />
           <NavButton icon={<DollarSign size={20} />} label="المرتب" active={isActive('/worker/salary')} onClick={() => navigate('/worker/salary')} />
           <NavButton icon={<Settings size={20} />} label="الإعدادات" active={isActive('/worker/settings')} onClick={() => navigate('/worker/settings')} />
         </div>
       </nav>
+
+
   );
 };
 

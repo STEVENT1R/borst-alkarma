@@ -42,10 +42,17 @@ router.post('/pay', auth, role('supervisor'), async (req, res) => {
       [amount, `مرتب مدفوع`, result.rows[0].id]
     );
 
+    // إنشاء رسالة الإشعار مع التفاصيل
+    let notifyMsg = `تم إيداع مرتبك بمبلغ ${amount} ج.م`;
+    const dedVal = parseFloat(deduction_amount || 0) || 0;
+    const bonusVal = parseFloat(bonus_amount || 0) || 0;
+    if (dedVal > 0) notifyMsg += ` | خصم: ${dedVal} ج.م${deduction_reason ? ` (${deduction_reason})` : ''}`;
+    if (bonusVal > 0) notifyMsg += ` | زيادة: ${bonusVal} ج.م${bonus_reason ? ` (${bonus_reason})` : ''}`;
+
     // إشعار للعامل
     await db.query(
       'INSERT INTO notifications (user_id, message) VALUES ($1, $2)',
-      [worker_id, `تم إيداع مرتبك بمبلغ ${amount} ج.م`]
+      [worker_id, notifyMsg]
     );
 
     res.status(201).json(result.rows[0]);

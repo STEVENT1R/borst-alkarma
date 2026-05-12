@@ -403,11 +403,12 @@ router.post('/bulk', auth, role('cashier'), async (req, res) => {
 
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: err.message || 'خطأ في الخادم' });
+    res.status(500).json({ error: 'خطأ في الخادم' });
   }
 });
 
 // POST /api/sales/shop-spoilage - تسجيل هالك في مخزن المحل (الكاشير)
+
 router.post('/shop-spoilage', auth, role('cashier'), async (req, res) => {
   try {
     const { product_name, quantity, description } = req.body;
@@ -492,8 +493,10 @@ router.post('/shop-spoilage', auth, role('cashier'), async (req, res) => {
 
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: err.message || 'خطأ في الخادم' });
+    res.status(500).json({ error: 'خطأ في الخادم' });
   }
 });
 
 module.exports = router;
+
+

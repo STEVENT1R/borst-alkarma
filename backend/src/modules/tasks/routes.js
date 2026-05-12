@@ -4,40 +4,101 @@ const auth = require('../../middleware/auth');
 const role = require('../../middleware/role');
 const db = require('../../config/db');
 
-// POST /api/tasks – إنشاء مهمة (مشرف)
-router.post('/', auth, role('supervisor'), async (req, res) => {
+// POST /api/tasks – إنشاء مهمة (مشرف أو عامل)
+// if from_load = true: المنتج موجود بالفعل في حمولة العامل (مخزون متحرك)
+router.post('/', auth, async (req, res) => {
   try {
-    const { worker_id, title, receiver_name, product_name, quantity, unit_type, price, reminder_time, sale_type, notes } = req.body;
+    const { worker_id, title, receiver_name, product_name, quantity, unit_type, price, reminder_time, sale_type, notes, from_load } = req.body;
+    
+    // الصلاحية: المشرف أو العامل (لنفسه)
+    if (req.user.role !== 'supervisor' && req.user.role !== 'worker') {
+      return res.status(403).json({ error: 'غير مصرح' });
+    }
+    const finalWorkerId = worker_id || req.user.id;
+    // العامل يعمل مهمة لنفسه فقط
+    if (req.user.role === 'worker' && finalWorkerId !== req.user.id) {
+      return res.status(403).json({ error: 'لا يمكنك إنشاء مهمة لعامل آخر' });
+    }
 
-    // التحقق من المخزون: المنتج موجود والكمية كافية
-    if (product_name && product_name.trim() && quantity && parseFloat(quantity) > 0) {
-      const inv = await db.query('SELECT id, quantity FROM inventory WHERE product_name = $1', [product_name.trim()]);
-      if (inv.rows.length === 0) {
-        return res.status(400).json({ error: `المنتج "${product_name}" غير موجود في المخزون` });
-      }
-      const availableQty = parseFloat(inv.rows[0].quantity) || 0;
-      const requestedQty = parseFloat(quantity);
-      if (requestedQty > availableQty) {
-        return res.status(400).json({ error: `الكمية المطلوبة (${requestedQty}) أكبر من المتاح في المخزون (${availableQty})` });
+    const finalProductName = product_name && product_name.trim() ? product_name.trim() : null;
+    const finalQuantity = parseFloat(quantity) || 0;
+    const finalUnitType = unit_type || 'unit';
+
+    if (finalProductName && finalQuantity > 0) {
+      if (from_load) {
+        // المنتج من حمولة العامل (موجود فعلاً معاه)
+        const loadItem = await db.query(
+          'SELECT * FROM worker_load WHERE worker_id = $1 AND product_name = $2',
+          [finalWorkerId, finalProductName]
+        );
+        if (loadItem.rows.length === 0) {
+          return res.status(400).json({ error: `المنتج "${finalProductName}" غير موجود في عهدة العامل` });
+        }
+        const loadQty = parseFloat(loadItem.rows[0].quantity) || 0;
+        if (finalQuantity > loadQty) {
+          return res.status(400).json({ error: `الكمية المطلوبة (${finalQuantity}) أكبر من المتاح في العهدة (${loadQty})` });
+        }
+        // مش بنخصم من العهدة دلوقتي - الخصم هيحصل وقت التسليم (delivery)
+        // عشان العامل ممكن يلغي المهمة قبل التنفيذ
+      } else {
+        // المنتج من المخزون العام (لأول مرة)
+        const inv = await db.query('SELECT id, quantity, unit_type FROM inventory WHERE product_name = $1', [finalProductName]);
+        if (inv.rows.length === 0) {
+          return res.status(400).json({ error: `المنتج "${finalProductName}" غير موجود في المخزون` });
+        }
+        const availableQty = parseFloat(inv.rows[0].quantity) || 0;
+        if (finalQuantity > availableQty) {
+          return res.status(400).json({ error: `الكمية المطلوبة (${finalQuantity}) أكبر من المتاح في المخزون (${availableQty})` });
+        }
+        // خصم من المخزون
+        await db.query(
+          'UPDATE inventory SET quantity = quantity - $1, updated_at = NOW() WHERE product_name = $2',
+          [finalQuantity, finalProductName]
+        );
       }
     }
 
     const result = await db.query(
       `INSERT INTO tasks (supervisor_id, worker_id, title, receiver_name, product_name, quantity, unit_type, price, reminder_time, sale_type, notes)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
-      [req.user.id, worker_id, title, receiver_name, product_name, quantity, unit_type || 'unit', price, reminder_time || null, sale_type || 'retail', notes || null]
+      [req.user.id, finalWorkerId, title, receiver_name, finalProductName, finalQuantity, finalUnitType, price, reminder_time || null, sale_type || 'retail', notes || null]
     );
 
     const task = result.rows[0];
 
+    // نقل البضاعة لحمولة العامل (فقط لو المخزون العام مش لو from_load)
+    if (!from_load && finalProductName && finalQuantity > 0 && finalWorkerId) {
+      const existingLoad = await db.query(
+        'SELECT * FROM worker_load WHERE worker_id = $1 AND product_name = $2',
+        [finalWorkerId, finalProductName]
+      );
+      if (existingLoad.rows.length > 0) {
+        await db.query(
+          'UPDATE worker_load SET quantity = quantity + $1, updated_at = NOW() WHERE worker_id = $2 AND product_name = $3',
+          [finalQuantity, finalWorkerId, finalProductName]
+        );
+      } else {
+        await db.query(
+          'INSERT INTO worker_load (worker_id, product_name, quantity, unit_type) VALUES ($1, $2, $3, $4)',
+          [finalWorkerId, finalProductName, finalQuantity, finalUnitType]
+        );
+      }
+      // تسجيل حركة مخزون
+      await db.query(
+        `INSERT INTO inventory_transactions (product_name, user_id, task_id, quantity_change, transaction_type)
+         VALUES ($1, $2, $3, $4, 'deduction')`,
+        [finalProductName, req.user.id, task.id, -finalQuantity]
+      );
+    }
+
     // إشعار العامل
     await db.query(
       'INSERT INTO notifications (user_id, message) VALUES ($1, $2)',
-      [worker_id, `تم تعيين مهمة جديدة لك: ${title}`]
+      [finalWorkerId, `تم تعيين مهمة جديدة لك: ${title}`]
     );
 
     // إشعار للمشرف نفسه لو المهمة شخصية
-    if (req.user.id === worker_id) {
+    if (req.user.id === finalWorkerId) {
       await db.query(
         'INSERT INTO notifications (user_id, message) VALUES ($1, $2)',
         [req.user.id, `تم إنشاء مهمة شخصية: ${title}`]
@@ -56,6 +117,7 @@ router.post('/', auth, role('supervisor'), async (req, res) => {
     }
 
     res.status(201).json(task);
+
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -209,48 +271,61 @@ router.patch('/:id/status', auth, async (req, res) => {
           }
         }
 
-        // خصم من المخزون (لغير الاستلاف وللاستلام النقدي فقط)
-        // delivered: فيه بضاعة → نخصم
+        // خصم من حمولة العامل (بدل المخزون - العامل شايل البضاعة معاه)
+        // delivered: فيه بضاعة → نخصم من حمولة العامل
         // loaded: فلوس بس من غير بضاعة → منخصمش
-        // delivered_and_loaded: بضاعة + فلوس → نخصم
-        if ((status === 'delivered' || status === 'delivered_and_loaded') && task.product_name && task.quantity) {
+        // delivered_and_loaded: بضاعة + فلوس → نخصم من حمولة العامل
+        if ((status === 'delivered' || status === 'delivered_and_loaded') && task.product_name && task.quantity && task.worker_id) {
           try {
-            const inv = await db.query('SELECT id, quantity, purchase_price FROM inventory WHERE product_name = $1', [task.product_name]);
-            if (inv.rows.length > 0) {
-              // التحقق من وجود كمية كافية في المخزون
-              const currentQty = parseFloat(inv.rows[0].quantity) || 0;
-              const deductQty = parseFloat(task.quantity) || 0;
-              if (deductQty > currentQty) {
-                console.warn(`محاولة خصم ${deductQty} من ${task.product_name} والكمية المتاحة ${currentQty}`);
+            const deductQty = parseFloat(task.quantity) || 0;
+            
+            // خصم من حمولة العامل
+            const workerItem = await db.query(
+              'SELECT * FROM worker_load WHERE worker_id = $1 AND product_name = $2',
+              [task.worker_id, task.product_name]
+            );
+            if (workerItem.rows.length > 0) {
+              const workerQty = parseFloat(workerItem.rows[0].quantity) || 0;
+              if (deductQty >= workerQty) {
+                // حذف السجل لو الكمية كلها اتصرفت
+                await db.query(
+                  'DELETE FROM worker_load WHERE worker_id = $1 AND product_name = $2',
+                  [task.worker_id, task.product_name]
+                );
+              } else {
+                await db.query(
+                  'UPDATE worker_load SET quantity = quantity - $1, updated_at = NOW() WHERE worker_id = $2 AND product_name = $3',
+                  [deductQty, task.worker_id, task.product_name]
+                );
               }
-              const newQty = Math.max(0, currentQty - deductQty);
-              await db.query(
-                'UPDATE inventory SET quantity = $1, updated_at = NOW() WHERE product_name = $2',
-                [newQty, task.product_name]
-              );
-              // سجل الحركة
-              await db.query(
-                `INSERT INTO inventory_transactions (product_name, user_id, task_id, quantity_change, transaction_type)
-                 VALUES ($1, $2, $3, $4, 'deduction')`,
-                [task.product_name, task.worker_id, task.id, -task.quantity]
-              );
-
-              // تنبيه مخزون منخفض
-              const updated = await db.query('SELECT quantity FROM inventory WHERE product_name = $1', [task.product_name]);
-              if (updated.rows[0].quantity < 5) {
-                const supers = await db.query("SELECT id FROM users WHERE role = 'supervisor'");
-                for (const s of supers.rows) {
-                  await db.query(
-                    'INSERT INTO notifications (user_id, message) VALUES ($1, $2)',
-                    [s.id, `المخزون من ${task.product_name} منخفض (الكمية: ${updated.rows[0].quantity})`]
-                  );
+            } else {
+              // لو مش لاقي في حمولة العامل، نخصم من المخزون مباشرة (حالة استثنائية)
+              const inv = await db.query('SELECT id, quantity FROM inventory WHERE product_name = $1', [task.product_name]);
+              if (inv.rows.length > 0) {
+                const currentQty = parseFloat(inv.rows[0].quantity) || 0;
+                if (deductQty > currentQty) {
+                  console.warn(`محاولة خصم ${deductQty} من ${task.product_name} والكمية المتاحة ${currentQty}`);
                 }
+                const newQty = Math.max(0, currentQty - deductQty);
+                await db.query(
+                  'UPDATE inventory SET quantity = $1, updated_at = NOW() WHERE product_name = $2',
+                  [newQty, task.product_name]
+                );
               }
             }
+            
+            // سجل الحركة
+            await db.query(
+              `INSERT INTO inventory_transactions (product_name, user_id, task_id, quantity_change, transaction_type)
+               VALUES ($1, $2, $3, $4, 'deduction')`,
+              [task.product_name, task.worker_id, task.id, -deductQty]
+            );
+
           } catch (err) {
-            console.error('Inventory deduction error:', err);
+            console.error('Load deduction error:', err);
           }
         }
+
 
         // تسجيل COGS في profit_log لو في بضاعة اتباعت
         if (cogsAmount > 0) {
@@ -268,12 +343,18 @@ router.patch('/:id/status', auth, async (req, res) => {
           const receiverId = receiver.rows[0].id;
             if (status === 'delivered') {
             // تحميل بضاعة (دينا بضاعة للمستلم) - المستلم مديون لنا (موجب)
-            // price هو السعر الإجمالي للمهمة كلها (مجموع الكمية × سعر الوحدة)
             await db.query(
               `INSERT INTO receiver_transactions (receiver_id, task_id, transaction_type, amount, description)
                VALUES ($1, $2, 'goods_delivered', $3, $4)`,
               [receiverId, task.id, Math.abs(task.price), `تحميل بضاعة: ${task.product_name} - ${task.title}`]
             );
+            // تسجيل الربح بقيمة المهمة كاملة (الربح ملوش دعوه بالاجل - اتحسب فور التحميل)
+            await db.query(
+              `INSERT INTO profit_log (entry_type, amount, description, reference_type, reference_id)
+               VALUES ('profit', $1, $2, 'task', $3)`,
+              [task.price, `ربح من ${task.receiver_name} - ${task.title}`, task.id]
+            );
+            // ملاحظة: الإيراد (الكاش) مش بيتسجل هنا - هيتسجل وقت التحصيل
           } else if (status === 'loaded') {
             // استلام أموال (استلمنا فلوس من المستلم) - يخصم من مديونيته (سالب)
             await db.query(
@@ -281,13 +362,20 @@ router.patch('/:id/status', auth, async (req, res) => {
                VALUES ($1, $2, 'money_received', $3, $4)`,
               [receiverId, task.id, -Math.abs(task.price), `استلام أموال: ${task.product_name} - ${task.title}`]
             );
-            // تسجيل الإيراد - price هو السعر الإجمالي (ليس price × quantity)
-            await db.query(
-              `INSERT INTO profit_log (entry_type, amount, description, reference_type, reference_id)
-               VALUES ('revenue', $1, $2, 'task', $3)`,
-              [task.price, `إيراد من ${task.receiver_name} - ${task.title}`, task.id]
-            );
+            // الفلوس تروح لعهدة العامل (هو اللي جمعها)
+            if (task.worker_id) {
+              await db.query(
+                'UPDATE users SET cash_balance = cash_balance + $1 WHERE id = $2',
+                [parseFloat(task.price), task.worker_id]
+              );
+              await db.query(
+                `INSERT INTO worker_cash_custody (worker_id, amount, type, description, reference_type, reference_id)
+                 VALUES ($1, $2, 'collected_from_tasks', $3, 'task', $4)`,
+                [task.worker_id, parseFloat(task.price), `تحصيل فلوس من ${task.receiver_name} - ${task.title}`, task.id]
+              );
+            }
           } else if (status === 'delivered_and_loaded') {
+
             // تحميل بضاعة + استلام أموال معاً
             // تحميل بضاعة: المستلم مديون لنا (موجب)
             await db.query(
@@ -301,12 +389,33 @@ router.patch('/:id/status', auth, async (req, res) => {
                VALUES ($1, $2, 'money_received', $3, $4)`,
               [receiverId, task.id, -Math.abs(task.price), `استلام أموال: ${task.product_name} - ${task.title}`]
             );
+            // تسجيل الربح بقيمة المهمة كاملة (الربح ملوش دعوه بالاجل)
+            await db.query(
+              `INSERT INTO profit_log (entry_type, amount, description, reference_type, reference_id)
+               VALUES ('profit', $1, $2, 'task', $3)`,
+              [task.price, `ربح من ${task.receiver_name} - ${task.title}`, task.id]
+            );
+            // تسجيل الإيراد النقدي الفعلي (الفلوس اللي دخلت الخزنة فعلياً)
             await db.query(
               `INSERT INTO profit_log (entry_type, amount, description, reference_type, reference_id)
                VALUES ('revenue', $1, $2, 'task', $3)`,
-              [task.price, `إيراد من ${task.receiver_name} - ${task.title}`, task.id]
+              [task.price, `إيراد نقدي من ${task.receiver_name} - ${task.title}`, task.id]
             );
+            // الفلوس تروح لعهدة العامل (هو اللي جمعها)
+            if (task.worker_id) {
+              await db.query(
+                'UPDATE users SET cash_balance = cash_balance + $1 WHERE id = $2',
+                [parseFloat(task.price), task.worker_id]
+              );
+              await db.query(
+                `INSERT INTO worker_cash_custody (worker_id, amount, type, description, reference_type, reference_id)
+                 VALUES ($1, $2, 'collected_from_tasks', $3, 'task', $4)`,
+                [task.worker_id, parseFloat(task.price), `تحصيل فلوس من ${task.receiver_name} - ${task.title}`, task.id]
+              );
+            }
           }
+
+
 
         }
       }
@@ -381,15 +490,29 @@ router.post('/:id/collect', auth, async (req, res) => {
       [receiverId, task.id, -Math.abs(parseFloat(amount)), description || `تحصيل من ${task.receiver_name} - ${task.title}`]
     );
 
-    // تسجيل الإيراد في سجل الأرباح
+    // تسجيل الإيراد النقدي الفعلي (الفلوس اللي اتحصنت فعلاً)
     await db.query(
       `INSERT INTO profit_log (entry_type, amount, description, reference_type, reference_id)
        VALUES ('revenue', $1, $2, 'task', $3)`,
-      [Math.abs(parseFloat(amount)), `تحصيل من ${task.receiver_name} - ${task.title}`, task.id]
+      [parseFloat(amount), `تحصيل من ${task.receiver_name} - ${task.title}`, task.id]
     );
+
+    // الفلوس تروح لعهدة العامل (هو اللي جمعها)
+    if (task.worker_id) {
+      await db.query(
+        'UPDATE users SET cash_balance = cash_balance + $1 WHERE id = $2',
+        [parseFloat(amount), task.worker_id]
+      );
+      await db.query(
+        `INSERT INTO worker_cash_custody (worker_id, amount, type, description, reference_type, reference_id)
+         VALUES ($1, $2, 'collected_from_tasks', $3, 'task', $4)`,
+        [task.worker_id, parseFloat(amount), `تحصيل من ${task.receiver_name} - ${task.title}`, task.id]
+      );
+    }
 
     // حساب إجمالي المحصل (القديم + الجديد)
     const totalCollected = parseFloat(task.collected_amount || 0) + parseFloat(amount);
+
 
     // لو إجمالي المحصل >= سعر المهمة -> نكملها، لو أقل -> تفضل "تم التحميل" عشان يقدر يكمل تحصيل
     if (totalCollected >= parseFloat(task.price)) {
@@ -506,32 +629,55 @@ router.post('/:id/complete', auth, async (req, res) => {
 
       const finalAmountPaid = parseFloat(amount_paid) || 0;
       
-      // خصم من المخزون لو في منتج
-      if (finalProductName && finalQuantity > 0) {
+      // خصم من حمولة العامل لو في منتج (العامل شايل البضاعة)
+      if (finalProductName && finalQuantity > 0 && task.worker_id) {
         try {
-          const inv = await db.query('SELECT id, quantity, purchase_price FROM inventory WHERE product_name = $1', [finalProductName]);
-          if (inv.rows.length > 0) {
-            const currentQty = parseFloat(inv.rows[0].quantity) || 0;
-            const deductQty = finalQuantity;
-            if (deductQty > currentQty) {
-              console.warn(`محاولة خصم ${deductQty} من ${finalProductName} والكمية المتاحة ${currentQty}`);
+          const deductQty = finalQuantity;
+          
+          // خصم من حمولة العامل
+          const workerItem = await db.query(
+            'SELECT * FROM worker_load WHERE worker_id = $1 AND product_name = $2',
+            [task.worker_id, finalProductName]
+          );
+          if (workerItem.rows.length > 0) {
+            const workerQty = parseFloat(workerItem.rows[0].quantity) || 0;
+            if (deductQty >= workerQty) {
+              await db.query(
+                'DELETE FROM worker_load WHERE worker_id = $1 AND product_name = $2',
+                [task.worker_id, finalProductName]
+              );
+            } else {
+              await db.query(
+                'UPDATE worker_load SET quantity = quantity - $1, updated_at = NOW() WHERE worker_id = $2 AND product_name = $3',
+                [deductQty, task.worker_id, finalProductName]
+              );
             }
-            const newQty = Math.max(0, currentQty - deductQty);
-            await db.query(
-              'UPDATE inventory SET quantity = $1, updated_at = NOW() WHERE product_name = $2',
-              [newQty, finalProductName]
-            );
-            // سجل الحركة
-            await db.query(
-              `INSERT INTO inventory_transactions (product_name, user_id, task_id, quantity_change, transaction_type)
-               VALUES ($1, $2, $3, $4, 'deduction')`,
-              [finalProductName, task.worker_id, task.id, -finalQuantity]
-            );
+          } else {
+            // لو مش لاقي في الحمولة، نخصم من المخزون (حالة نادرة)
+            const inv = await db.query('SELECT id, quantity FROM inventory WHERE product_name = $1', [finalProductName]);
+            if (inv.rows.length > 0) {
+              const currentQty = parseFloat(inv.rows[0].quantity) || 0;
+              if (deductQty > currentQty) {
+                console.warn(`محاولة خصم ${deductQty} من ${finalProductName} والكمية المتاحة ${currentQty}`);
+              }
+              const newQty = Math.max(0, currentQty - deductQty);
+              await db.query(
+                'UPDATE inventory SET quantity = $1, updated_at = NOW() WHERE product_name = $2',
+                [newQty, finalProductName]
+              );
+            }
           }
+          // سجل الحركة
+          await db.query(
+            `INSERT INTO inventory_transactions (product_name, user_id, task_id, quantity_change, transaction_type)
+             VALUES ($1, $2, $3, $4, 'deduction')`,
+            [finalProductName, task.worker_id, task.id, -finalQuantity]
+          );
         } catch (err) {
-          console.error('Inventory deduction error:', err);
+          console.error('Load deduction error:', err);
         }
       }
+
       
       // لو في مستلم، نسجل في receiver_transactions
       if (finalReceiverName && finalReceiverName.trim()) {
@@ -562,35 +708,91 @@ router.post('/:id/complete', auth, async (req, res) => {
              VALUES ($1, $2, 'money_received', $3, $4)`,
             [receiverId, id, -finalAmountPaid, `استلام أموال من ${finalReceiverName} - ${task.title}`]
           );
-          
-          // تسجيل إيراد
+        }
+        
+        // تسجيل الربح بقيمة المهمة كاملة (الربح ملوش دعوه بالاجل، حتى لو العميل مديون)
+        await db.query(
+          `INSERT INTO profit_log (entry_type, amount, description, reference_type, reference_id)
+           VALUES ('profit', $1, $2, 'task', $3)`,
+          [finalTotalCost, `ربح من ${finalReceiverName} - ${task.title}`, id]
+        );
+        
+        // تسجيل الإيراد النقدي الفعلي (الفلوس اللي اتحصنت فعلاً)
+        if (finalAmountPaid > 0) {
           await db.query(
             `INSERT INTO profit_log (entry_type, amount, description, reference_type, reference_id)
              VALUES ('revenue', $1, $2, 'task', $3)`,
-            [finalAmountPaid, `إيراد من ${finalReceiverName} - ${task.title}`, id]
+            [finalAmountPaid, `إيراد نقدي من ${finalReceiverName} - ${task.title}`, id]
           );
         }
+
         
-        // تسجيل التكلفة في profit_log كـ cogs
-        if (finalTotalCost > 0) {
-          await db.query(
-            `INSERT INTO profit_log (entry_type, amount, description, reference_type, reference_id)
-             VALUES ('cogs', $1, $2, 'task', $3)`,
-            [finalTotalCost, `تكلفة بضاعة: ${finalProductName || ''} - ${task.title}`, id]
-          );
+        // تسجيل التكلفة في profit_log كـ cogs (بسعر الشرا مش سعر البيع)
+        if (finalProductName && finalQuantity > 0) {
+          const cogsInv = await db.query('SELECT purchase_price FROM inventory WHERE product_name = $1', [finalProductName.trim()]);
+          let cogsAmount = 0;
+          if (cogsInv.rows.length > 0) {
+            const purchasePrice = parseFloat(cogsInv.rows[0].purchase_price) || 0;
+            if (purchasePrice > 0) {
+              cogsAmount = finalQuantity * purchasePrice;
+            }
+          }
+          // لو ملقناش purchase_price من المخزون، نستخدم آخر سعر شرا معروف
+          if (cogsAmount <= 0 && finalTotalCost > 0) {
+            cogsAmount = finalTotalCost; // fallback
+          }
+          if (cogsAmount > 0) {
+            await db.query(
+              `INSERT INTO profit_log (entry_type, amount, description, reference_type, reference_id)
+               VALUES ('cogs', $1, $2, 'task', $3)`,
+              [cogsAmount, `تكلفة بضاعة: ${finalProductName || ''} - ${task.title}`, id]
+            );
+          }
         }
+
       }
       
       // تحديث المهمة
-      await db.query(
-        `UPDATE tasks SET 
-          product_name = $1, quantity = $2, unit_type = $3,
-          receiver_name = COALESCE($4, receiver_name),
-          notes = CASE WHEN $5 IS NOT NULL AND $5 != '' THEN $5 ELSE notes END,
-          status = 'completed', completed_at = NOW(), updated_at = NOW()
-        WHERE id = $6`,
-        [finalProductName, finalQuantity, finalUnitType, finalReceiverName || null, notes || null, id]
-      );
+      // نجهز القيم في JavaScript عشان نتجنب مشكلة type determination في PostgreSQL للـ null parameters
+      const useReceiverName = finalReceiverName && finalReceiverName.trim() ? finalReceiverName.trim() : null;
+      const useNotes = notes && notes.trim() ? notes.trim() : null;
+      
+      if (useReceiverName && useNotes) {
+        await db.query(
+          `UPDATE tasks SET 
+            product_name = $1, quantity = $2, unit_type = $3,
+            receiver_name = $4, notes = $5,
+            status = 'completed', completed_at = NOW(), updated_at = NOW()
+          WHERE id = $6`,
+          [finalProductName, finalQuantity, finalUnitType, useReceiverName, useNotes, id]
+        );
+      } else if (useReceiverName) {
+        await db.query(
+          `UPDATE tasks SET 
+            product_name = $1, quantity = $2, unit_type = $3,
+            receiver_name = $4,
+            status = 'completed', completed_at = NOW(), updated_at = NOW()
+          WHERE id = $5`,
+          [finalProductName, finalQuantity, finalUnitType, useReceiverName, id]
+        );
+      } else if (useNotes) {
+        await db.query(
+          `UPDATE tasks SET 
+            product_name = $1, quantity = $2, unit_type = $3,
+            notes = $4,
+            status = 'completed', completed_at = NOW(), updated_at = NOW()
+          WHERE id = $5`,
+          [finalProductName, finalQuantity, finalUnitType, useNotes, id]
+        );
+      } else {
+        await db.query(
+          `UPDATE tasks SET 
+            product_name = $1, quantity = $2, unit_type = $3,
+            status = 'completed', completed_at = NOW(), updated_at = NOW()
+          WHERE id = $4`,
+          [finalProductName, finalQuantity, finalUnitType, id]
+        );
+      }
       
       await db.query('COMMIT');
       
@@ -607,9 +809,12 @@ router.post('/:id/complete', auth, async (req, res) => {
       throw txErr;
     }
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Server error' });
+    console.error('❌ /complete error:', err.message || err);
+    console.error(err.stack);
+    res.status(500).json({ error: 'Server error', details: err.message });
   }
 });
 
 module.exports = router;
+
+

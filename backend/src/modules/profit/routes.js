@@ -24,27 +24,32 @@ router.get('/summary', auth, role('supervisor'), async (req, res) => {
   try {
     const result = await db.query(`
       SELECT
+        -- الإيراد النقدي الفعلي = الفلوس اللي دخلت الخزنة (كاش)
         COALESCE(SUM(CASE WHEN entry_type IN ('revenue', 'sale_revenue') THEN amount ELSE 0 END), 0) as total_revenue,
         COALESCE(SUM(CASE WHEN entry_type = 'salary_payment' THEN amount ELSE 0 END), 0) as total_salaries,
         COALESCE(SUM(CASE WHEN entry_type = 'spoilage' THEN amount ELSE 0 END), 0) as total_spoilage,
         COALESCE(SUM(CASE WHEN entry_type = 'expense' THEN amount ELSE 0 END), 0) as total_expenses,
         COALESCE(SUM(CASE WHEN entry_type = 'purchase' THEN amount ELSE 0 END), 0) as total_purchases,
-        -- صافي الربح = الإيرادات - تكلفة البضاعة المباعة فقط (بدون هالك)
+        -- صافي الربح = قيمة المهمات كاملة (profit) - تكلفة البضاعة المباعة (cogs)
+        -- profit = قيمة المهمة كاملة (ملوش دعوة اتحصنت كام)، cogs = التكلفة
         COALESCE(SUM(
           CASE 
-            WHEN entry_type IN ('revenue', 'profit', 'sale_revenue') THEN amount
-            WHEN entry_type IN ('cogs') THEN -amount
+            WHEN entry_type = 'profit' THEN amount
+            WHEN entry_type = 'cogs' THEN -amount
+            WHEN entry_type = 'sale_revenue' THEN amount
             ELSE 0
           END
         ), 0) as total_profit,
-        -- النقدية = كل الداخل - كل الخارج النقدي
+        -- النقدية = الإيراد النقدي الفعلي - المصروفات النقدية
+        -- (profit مش نقدي، ده بند محاسبي)
         COALESCE(SUM(
           CASE 
-            WHEN entry_type IN ('revenue', 'profit', 'sale_revenue', 'opening_balance') THEN amount
+            WHEN entry_type IN ('revenue', 'sale_revenue', 'opening_balance') THEN amount
             WHEN entry_type IN ('salary_payment', 'spoilage', 'expense', 'purchase') THEN -amount
             ELSE 0
           END
         ), 0) as current_liquidity,
+
         -- قيمة المخزن = مجموع (الكمية × سعر الشراء) لكل المنتجات
         COALESCE(
           (SELECT SUM(quantity * purchase_price) FROM inventory WHERE quantity > 0 AND purchase_price > 0),
@@ -64,18 +69,19 @@ router.get('/today', auth, role('supervisor'), async (req, res) => {
   try {
     const result = await db.query(`
       SELECT
-        -- صافي الإيراد اليوم = الإيرادات - المصروفات - المرتبات - الهالك
+        -- صافي الإيراد اليوم = الإيراد النقدي الفعلي - المصروفات - المرتبات - الهالك
         COALESCE(SUM(
           CASE 
-            WHEN entry_type IN ('revenue', 'profit', 'sale_revenue') THEN amount
+            WHEN entry_type IN ('revenue', 'sale_revenue') THEN amount
             WHEN entry_type IN ('expense', 'salary_payment', 'spoilage') THEN -amount
             ELSE 0
           END
         ), 0) as net_revenue_today,
-        -- صافي الربح اليوم = الإيرادات - تكلفة البضاعة - المصروفات - المرتبات - الهالك
+        -- صافي الربح اليوم = قيمة المهمات (profit) - تكلفة البضاعة - المصروفات - المرتبات - الهالك
         COALESCE(SUM(
           CASE 
-            WHEN entry_type IN ('revenue', 'profit', 'sale_revenue') THEN amount
+            WHEN entry_type = 'profit' THEN amount
+            WHEN entry_type IN ('sale_revenue') THEN amount
             WHEN entry_type IN ('cogs', 'expense', 'salary_payment', 'spoilage') THEN -amount
             ELSE 0
           END
@@ -90,6 +96,7 @@ router.get('/today', auth, role('supervisor'), async (req, res) => {
         AND entry_type != 'opening_balance'
 
     `);
+
     res.json(result.rows[0]);
   } catch (err) {
     console.error(err);

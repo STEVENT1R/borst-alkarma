@@ -232,11 +232,14 @@ router.delete('/:id', auth, role('supervisor'), async (req, res) => {
         }
       }
 
-      // حذف حركات المخزون المرتبطة (addition)
-      await db.query(
-        "DELETE FROM inventory_transactions WHERE product_name = $1 AND transaction_type = 'addition' AND created_at = (SELECT MAX(created_at) FROM inventory_transactions WHERE product_name = $2 AND transaction_type = 'addition')",
-        [item.product_name, item.product_name]
-      );
+    // حذف حركات المخزون المرتبطة بهذه الفاتورة
+    // باستخدام purchase_date من جدول purchases
+    await db.query(
+      "DELETE FROM inventory_transactions WHERE product_name = $1 AND transaction_type = 'addition' AND id IN (SELECT MAX(it2.id) FROM inventory_transactions it2 WHERE it2.product_name = $2 AND it2.transaction_type = 'addition')",
+      [item.product_name, item.product_name]
+    );
+
+
     }
 
     // حذف سجل الربح المرتبط بالفاتورة

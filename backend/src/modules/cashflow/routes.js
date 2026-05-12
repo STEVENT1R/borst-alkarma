@@ -11,10 +11,11 @@ router.get('/', auth, role('supervisor'), async (req, res) => {
     let query = `
       SELECT entry_type, amount, description, created_at,
         CASE 
-          WHEN entry_type IN ('revenue', 'profit', 'sale_revenue') THEN amount
+          WHEN entry_type IN ('revenue', 'sale_revenue') THEN amount
           WHEN entry_type IN ('salary_payment', 'spoilage', 'expense', 'purchase') THEN -amount
           ELSE 0
         END as signed_amount
+
       FROM profit_log
     `;
     const params = [];
@@ -46,17 +47,18 @@ router.get('/balance', auth, role('supervisor'), async (req, res) => {
     const { date } = req.query;
     let query = `
       SELECT
-        COALESCE(SUM(CASE WHEN entry_type IN ('revenue', 'profit', 'sale_revenue') THEN amount ELSE 0 END), 0) as total_in,
+        COALESCE(SUM(CASE WHEN entry_type IN ('revenue', 'sale_revenue') THEN amount ELSE 0 END), 0) as total_in,
         COALESCE(SUM(CASE WHEN entry_type IN ('salary_payment', 'spoilage', 'expense', 'purchase') THEN amount ELSE 0 END), 0) as total_out,
         COALESCE(SUM(
           CASE 
-            WHEN entry_type IN ('revenue', 'profit', 'sale_revenue') THEN amount
+            WHEN entry_type IN ('revenue', 'sale_revenue') THEN amount
             WHEN entry_type IN ('salary_payment', 'spoilage', 'expense', 'purchase') THEN -amount
             ELSE 0
           END
         ), 0) as balance
       FROM profit_log
     `;
+
     
     if (date) {
       query += ' WHERE created_at::date <= $1';
@@ -81,15 +83,16 @@ router.get('/daily-summary', auth, role('supervisor'), async (req, res) => {
     const result = await db.query(`
       SELECT
         created_at::date as date,
-        COALESCE(SUM(CASE WHEN entry_type IN ('revenue', 'profit', 'sale_revenue') THEN amount ELSE 0 END), 0) as income,
+        COALESCE(SUM(CASE WHEN entry_type IN ('revenue', 'sale_revenue') THEN amount ELSE 0 END), 0) as income,
         COALESCE(SUM(CASE WHEN entry_type IN ('salary_payment', 'spoilage', 'expense', 'purchase') THEN amount ELSE 0 END), 0) as expenses,
         COALESCE(SUM(
           CASE 
-            WHEN entry_type IN ('revenue', 'profit', 'sale_revenue') THEN amount
+            WHEN entry_type IN ('revenue', 'sale_revenue') THEN amount
             WHEN entry_type IN ('salary_payment', 'spoilage', 'expense', 'purchase') THEN -amount
             ELSE 0
           END
         ), 0) as net
+
       FROM profit_log
       WHERE created_at >= CURRENT_DATE - $1::integer
       GROUP BY created_at::date

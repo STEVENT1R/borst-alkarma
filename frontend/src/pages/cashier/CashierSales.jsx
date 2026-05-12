@@ -248,7 +248,7 @@ const CashierSales = () => {
                 <p className="text-xs text-gray-300 mt-1">المنتجات التي نفذت كميتها لا تظهر هنا</p>
               </div>
             ) : (
-              filteredProducts.map(product => {
+              [...filteredProducts].sort((a, b) => a.product_name?.localeCompare(b.product_name, 'ar')).map(product => {
                 const inCartQty = cart
                   .filter(item => item.product_name === product.product_name)
                   .reduce((sum, item) => sum + item.quantity, 0);

@@ -1,29 +1,27 @@
 import { useState, useEffect } from 'react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
-import { Send, User, Package, DollarSign, Clock, Users, TrendingUp } from 'lucide-react';
+import { Send, Package, DollarSign, Clock, Users, TrendingUp } from 'lucide-react';
 
-const CreateTask = () => {
+const WorkerCreateTask = () => {
   const { user } = useAuth();
-  const [workers, setWorkers] = useState([]);
   const [receivers, setReceivers] = useState([]);
-  const [products, setProducts] = useState([]);
+  const [loadProducts, setLoadProducts] = useState([]); // المنتجات من العهدة
   const [form, setForm] = useState({
-    worker_id: '',
     title: '',
     receiver_name: '',
     product_name: '',
     quantity: '',
     unit_type: 'unit',
-    unit_selling_price: '', // سعر بيع الوحدة (يدوي)
+    unit_selling_price: '',
     reminder_time: '',
     notes: '',
   });
   const [message, setMessage] = useState({ type: '', text: '' });
   const [loading, setLoading] = useState(false);
 
-  // إحضار سعر الشراء للمنتج المختار والكمية المتاحة في المخزون
-  const selectedProduct = products.find(p => p.product_name === form.product_name) || null;
+  // إحضار سعر الشراء والكمية المتاحة من العهدة (load products)
+  const selectedProduct = loadProducts.find(p => p.product_name === form.product_name) || null;
   const purchasePrice = selectedProduct ? parseFloat(selectedProduct.purchase_price || 0) : 0;
   const availableQuantity = selectedProduct ? parseFloat(selectedProduct.quantity || 0) : 0;
   const quantity = parseFloat(form.quantity) || 0;
@@ -39,40 +37,42 @@ const CreateTask = () => {
 
   // التحقق من الكمية المتاحة
   const quantityError = form.product_name && form.quantity && parseFloat(form.quantity) > availableQuantity
-    ? `الكمية المتاحة في المخزون: ${fmt(availableQuantity)} ${form.unit_type === 'weight' ? 'كجم' : 'قطعة'}`
+    ? `الكمية المتاحة في العهدة: ${fmt(availableQuantity)} ${form.unit_type === 'weight' ? 'كجم' : 'قطعة'}`
     : '';
 
 
   useEffect(() => {
-    api.get('/users/workers').then(res => setWorkers(res.data)).catch(() => {});
-    api.get('/inventory').then(res => setProducts(res.data)).catch(() => {});
+    // جلب المنتجات من عهدة العامل مش من المخزون
+    if (user?.id) {
+      api.get(`/workers-load/${user.id}`).then(res => {
+        setLoadProducts(res.data.load || []);
+      }).catch(() => {});
+    }
     api.get('/receivers').then(res => setReceivers(res.data)).catch(() => {});
-  }, []);
+  }, [user?.id]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.worker_id) {
-      return setMessage({ type: 'error', text: 'يرجى اختيار العامل' });
-    }
     if (quantityError) {
       return setMessage({ type: 'error', text: quantityError });
     }
     setLoading(true);
     try {
       await api.post('/tasks', {
-        worker_id: parseInt(form.worker_id),
+        worker_id: user.id,
         title: form.title,
         receiver_name: form.receiver_name || null,
         product_name: form.product_name || null,
         quantity: form.quantity ? parseFloat(form.quantity) : 0,
         unit_type: form.unit_type,
-        price: totalSelling, // السعر الإجمالي اللي هيتحط في المهمة
+        price: totalSelling,
+        from_load: true, // المنتج من العهدة مش من المخزون
         reminder_time: form.reminder_time || null,
         notes: form.notes || null,
       });
       setMessage({ type: 'success', text: 'تم إنشاء المهمة بنجاح' });
       setForm({
-        worker_id: '', title: '', receiver_name: '', product_name: '',
+        title: '', receiver_name: '', product_name: '',
         quantity: '', unit_type: 'unit', unit_selling_price: '',
         reminder_time: '', notes: ''
       });
@@ -92,21 +92,12 @@ const CreateTask = () => {
       )}
 
       <form onSubmit={handleSubmit} className="bg-white p-6 rounded-2xl shadow-sm border space-y-4">
-        {/* صاحب المهمة */}
+        {/* عنوان المهمة (اختياري) */}
         <div>
-          <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1"><User size={16} /> صاحب المهمة</label>
-          <select value={form.worker_id} onChange={e => setForm({...form, worker_id: e.target.value})} className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50" required>
-            <option value="">اختر...</option>
-            <option value={user.id}>شخصي (أنا)</option>
-            {[...workers].sort((a, b) => a.username?.localeCompare(b.username, 'ar')).map(w => <option key={w.id} value={w.id}>{w.username}</option>)}
-          </select>
-        </div>
-
-        {/* عنوان المهمة */}
-        <div>
-          <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1"><Send size={16} /> عنوان المهمة</label>
+          <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1"><Send size={16} /> عنوان المهمة (اختياري)</label>
           <input value={form.title} onChange={e => setForm({...form, title: e.target.value})} className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50" placeholder="مثال: توصيل طلبية" />
         </div>
+
 
         {/* المستلم - اختيار من القائمة أو كتابة اسم جديد */}
         <div>
@@ -119,7 +110,7 @@ const CreateTask = () => {
             >
               <option value="">اختر مستلم قديم...</option>
               {[...receivers]
-                .filter(r => r.balance > 0) // اللي عليهم مديونيات أولاً
+                .filter(r => r.balance > 0)
                 .sort((a, b) => b.balance - a.balance || a.name?.localeCompare(b.name, 'ar'))
                 .map(r => (
                   <option key={r.id} value={r.name}>
@@ -128,7 +119,6 @@ const CreateTask = () => {
                 ))}
             </select>
           </div>
-          {/* حقل كتابة اسم مستلم جديد */}
           {!receivers.some(r => r.name === form.receiver_name) && (
             <input 
               value={form.receiver_name} 
@@ -137,7 +127,6 @@ const CreateTask = () => {
               placeholder="أو اكتب اسم مستلم جديد..." 
             />
           )}
-          {/* قائمة بكل المستلمين للاختيار السريع (زي المنتجات) */}
           {receivers.length > 0 && (
             <div className="mt-2">
               <details className="text-sm">
@@ -173,7 +162,6 @@ const CreateTask = () => {
           )}
         </div>
 
-
         {/* المنتج - اختيار من المخزون أو كتابة يدوية */}
         <div>
           <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1"><Package size={16} /> المنتج (اختياري)</label>
@@ -183,23 +171,23 @@ const CreateTask = () => {
               onChange={e => setForm({...form, product_name: e.target.value})}
               className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50 pr-10"
               placeholder="اكتب اسم المنتج..."
-              list="products-list"
+              list="load-products-list"
             />
-            <datalist id="products-list">
-              {[...products].sort((a, b) => a.product_name?.localeCompare(b.product_name, 'ar')).map(p => (
-                <option key={p.id} value={p.product_name}>
+            <datalist id="load-products-list">
+              {[...loadProducts].sort((a, b) => a.product_name?.localeCompare(b.product_name, 'ar')).map(p => (
+                <option key={p.product_name} value={p.product_name}>
                   {p.product_name} {p.unit_type === 'weight' ? '(وزن)' : `(${p.quantity} ${p.unit_type === 'weight' ? 'كجم' : 'قطعة'})`}
                 </option>
               ))}
             </datalist>
-            {products.length > 0 && (
+            {loadProducts.length > 0 && (
               <div className="mt-2">
                 <details className="text-sm">
-                  <summary className="text-blue-600 cursor-pointer font-medium">اختيار من المخزون ({products.length})</summary>
+                  <summary className="text-blue-600 cursor-pointer font-medium">اختيار من العهدة ({loadProducts.length})</summary>
                   <div className="mt-2 grid grid-cols-2 gap-2 max-h-48 overflow-y-auto border border-gray-200 rounded-xl p-2 bg-gray-50">
-                    {[...products].sort((a, b) => a.product_name?.localeCompare(b.product_name, 'ar')).map(p => (
+                    {[...loadProducts].sort((a, b) => a.product_name?.localeCompare(b.product_name, 'ar')).map(p => (
                       <button
-                        key={p.id}
+                        key={p.product_name}
                         type="button"
                         onClick={() => {
                           setForm({
@@ -242,7 +230,7 @@ const CreateTask = () => {
             <input type="number" step={form.unit_type === 'weight' ? '0.001' : '1'} value={form.quantity} onChange={e => setForm({...form, quantity: e.target.value})} className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50" />
             {form.product_name && selectedProduct && (
               <div className="text-xs text-gray-500 mt-1">
-                المتاح في المخزون: <span className="font-bold">{fmt(availableQuantity)} {form.unit_type === 'weight' ? 'كجم' : 'قطعة'}</span>
+                المتاح في العهدة: <span className="font-bold">{fmt(availableQuantity)} {form.unit_type === 'weight' ? 'كجم' : 'قطعة'}</span>
               </div>
             )}
           </div>
@@ -253,14 +241,13 @@ const CreateTask = () => {
           </div>
         )}
 
-
         {/* سعر بيع الوحدة */}
         <div>
           <label className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-1"><DollarSign size={14} /> سعر بيع الوحدة</label>
           <input type="number" step="0.01" value={form.unit_selling_price} onChange={e => setForm({...form, unit_selling_price: e.target.value})} className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50" placeholder="مثال: 105" />
         </div>
 
-        {/* أزرار سريعة للوزن (تظهر فقط عند اختيار وزن) */}
+        {/* أزرار سريعة للوزن */}
         {form.unit_type === 'weight' && (
           <div>
             <label className="text-sm font-medium text-gray-700 mb-1 block">أوزان سريعة</label>
@@ -294,7 +281,7 @@ const CreateTask = () => {
           </div>
         )}
 
-        {/* ملخص الحساب - يظهر لما يكون فيه منتج وكمية وسعر */}
+        {/* ملخص الحساب */}
         {selectedProduct && quantity > 0 && unitSellingPrice > 0 && (
           <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-xl border border-blue-100 space-y-2">
             <div className="flex items-center gap-2 text-sm font-bold text-blue-800 mb-2">
@@ -346,4 +333,4 @@ const CreateTask = () => {
   );
 };
 
-export default CreateTask;
+export default WorkerCreateTask;

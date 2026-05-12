@@ -23,7 +23,7 @@ const SalaryLog = () => {
         <p className="text-gray-400 text-center py-8">لا يوجد مدفوعات حتى الآن</p>
       ) : (
         <div className="space-y-2">
-          {payments.map(p => {
+          {[...payments].sort((a, b) => a.worker_name?.localeCompare(b.worker_name, 'ar')).map(p => {
             const deduction = parseFloat(p.deduction_amount || 0);
             const bonus = parseFloat(p.bonus_amount || 0);
             return (

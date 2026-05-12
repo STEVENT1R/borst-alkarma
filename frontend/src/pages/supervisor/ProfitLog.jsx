@@ -109,21 +109,24 @@ const ProfitLog = () => {
       {/* ملخص سريع */}
       <div className="grid grid-cols-2 gap-3 mb-4">
         <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-4 rounded-2xl shadow-sm border border-green-100">
-          <div className="text-xs text-gray-500">صافي الربح</div>
+          <div className="text-xs text-gray-500">صافي الربح (محاسبي)</div>
           <div className="text-lg font-extrabold text-green-700">{formatCurrency(summaryData.total_profit)} ج.م</div>
+          <div className="text-[10px] text-gray-400 mt-0.5">قيمة المهمات كلها - التكلفة</div>
         </div>
         <div className="bg-gradient-to-br from-teal-50 to-cyan-50 p-4 rounded-2xl shadow-sm border border-teal-100">
-          <div className="text-xs text-gray-500">النقدية</div>
+          <div className="text-xs text-gray-500">النقدية (الخزنة)</div>
           <div className="text-lg font-extrabold text-teal-700">{formatCurrency(summaryData.current_liquidity)} ج.م</div>
         </div>
         <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-4 rounded-2xl shadow-sm border border-blue-100">
-          <div className="text-xs text-gray-500">الإيرادات</div>
+          <div className="text-xs text-gray-500">الإيراد النقدي</div>
           <div className="font-bold text-blue-700">{formatCurrency(summaryData.total_revenue)} ج.م</div>
+          <div className="text-[10px] text-gray-400 mt-0.5">الفلوس اللي دخلت فعلياً</div>
         </div>
         <div className="bg-gradient-to-br from-red-50 to-rose-50 p-4 rounded-2xl shadow-sm border border-red-100">
           <div className="text-xs text-gray-500">إجمالي المصروفات</div>
           <div className="font-bold text-red-700">{formatCurrency(parseNum(summaryData.total_expenses) + parseNum(summaryData.total_salaries) + parseNum(summaryData.total_spoilage) + parseNum(summaryData.total_purchases))} ج.م</div>
         </div>
+
       </div>
 
       {/* توزيع المصروفات */}
@@ -168,8 +171,8 @@ const ProfitLog = () => {
             <input type="number" step="0.01" value={form.amount} onChange={e => setForm({...form, amount: e.target.value})} className="w-full border rounded-xl px-3 py-2 text-sm" required />
           </div>
           <div>
-            <label className="text-xs text-gray-500">الوصف</label>
-            <input type="text" value={form.description} onChange={e => setForm({...form, description: e.target.value})} className="w-full border rounded-xl px-3 py-2 text-sm" placeholder="وصف البند" required />
+            <label className="text-xs text-gray-500">الوصف (اختياري)</label>
+            <input type="text" value={form.description} onChange={e => setForm({...form, description: e.target.value})} className="w-full border rounded-xl px-3 py-2 text-sm" placeholder="وصف البند" />
           </div>
           <button type="submit" className="w-full bg-yellow-600 text-white py-2 rounded-xl hover:bg-yellow-700 transition-colors font-bold">
             حفظ

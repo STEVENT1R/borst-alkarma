@@ -1,18 +1,16 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
-import { UserPlus, Users, DollarSign, Trash2, Shield } from 'lucide-react';
+import { UserPlus, Users, Trash2, Settings, DollarSign } from 'lucide-react';
 
 const WorkerManagement = () => {
+  const navigate = useNavigate();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [accountType, setAccountType] = useState('personal');
   const [message, setMessage] = useState({ type: '', text: '' });
   const [allUsers, setAllUsers] = useState([]);
   const [workers, setWorkers] = useState([]);
-  const [selectedWorker, setSelectedWorker] = useState(null);
-  const [payAmount, setPayAmount] = useState('');
-  const [payMessage, setPayMessage] = useState({ type: '', text: '' });
-  const [showPayModal, setShowPayModal] = useState(false);
 
   useEffect(() => {
     fetchAllUsers();
@@ -34,23 +32,6 @@ const WorkerManagement = () => {
       setWorkers(res.data);
     } catch (err) {
       console.error('Failed to fetch workers', err);
-    }
-  };
-
-  const handlePaySalary = async (e) => {
-    e.preventDefault();
-    if (!payAmount || !selectedWorker) return;
-    try {
-      await api.post('/salaries/pay', {
-        worker_id: selectedWorker.id,
-        amount: parseFloat(payAmount),
-      });
-      setPayMessage({ type: 'success', text: `تم إيداع ${payAmount} جنيه لـ ${selectedWorker.username}` });
-      setPayAmount('');
-      setShowPayModal(false);
-      setSelectedWorker(null);
-    } catch (err) {
-      setPayMessage({ type: 'error', text: err.response?.data?.error || 'فشل في إيداع المرتب' });
     }
   };
 
@@ -165,19 +146,14 @@ const WorkerManagement = () => {
         </form>
       </div>
 
-      {/* قائمة المستخدمين مع إيداع المرتب */}
+      {/* قائمة العاملين مع زرار الإدارة */}
       <div className="bg-white p-6 rounded-2xl shadow-sm border mb-6">
         <div className="flex items-center gap-2 mb-4">
-          <DollarSign size={20} className="text-green-600" />
-          <span className="font-bold">إيداع المرتب</span>
+          <Settings size={20} className="text-blue-600" />
+          <span className="font-bold">إدارة العاملين</span>
         </div>
-        {payMessage.text && (
-          <div className={`p-3 rounded-xl mb-4 text-sm ${payMessage.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-            {payMessage.text}
-          </div>
-        )}
         <div className="space-y-3">
-          {workers.map(worker => (
+          {[...workers].sort((a, b) => a.username?.localeCompare(b.username, 'ar')).map(worker => (
             <div key={worker.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
               <div>
                 <span className="font-medium">{worker.username}</span>
@@ -185,20 +161,32 @@ const WorkerManagement = () => {
                   ({worker.account_type === 'shop' ? '🏪 محل' : '👤 شخصي'})
                 </span>
               </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => { setSelectedWorker(worker); setShowPayModal(true); }}
-                  className="bg-green-600 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-1"
-                >
-                  <DollarSign size={16} /> إيداع مرتب
-                </button>
-              </div>
+              <button
+                onClick={() => navigate(`/supervisor/worker-load/${worker.id}`)}
+                className="bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-1"
+              >
+                <Settings size={16} /> إدارة
+              </button>
             </div>
           ))}
           {workers.length === 0 && (
-            <p className="text-gray-400 text-center py-4">لا يوجد حسابات مسجلة</p>
+            <p className="text-gray-400 text-center py-4">لا يوجد حسابات عاملة مسجلة</p>
           )}
         </div>
+      </div>
+
+      {/* إدارة الرواتب */}
+      <div className="bg-white p-6 rounded-2xl shadow-sm border mb-6">
+        <div className="flex items-center gap-2 mb-4">
+          <DollarSign size={20} className="text-green-600" />
+          <span className="font-bold">إدارة الرواتب</span>
+        </div>
+        <button
+          onClick={() => navigate('/supervisor/manage-salaries')}
+          className="w-full bg-gradient-to-r from-green-600 to-green-500 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:from-green-700 hover:to-green-600 transition-colors"
+        >
+          <DollarSign size={18} /> الذهاب لإدارة الرواتب
+        </button>
       </div>
 
       {/* قائمة جميع المستخدمين - حذف الحسابات */}
@@ -208,7 +196,7 @@ const WorkerManagement = () => {
           <span className="font-bold">إدارة الحسابات (حذف)</span>
         </div>
         <div className="space-y-3">
-          {allUsers.filter(u => u.username !== 'admin').map(user => (
+          {[...allUsers].filter(u => u.username !== 'admin').sort((a, b) => a.username?.localeCompare(b.username, 'ar')).map(user => (
             <div key={user.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
               <div>
                 <span className="font-medium">{user.username}</span>
@@ -229,45 +217,6 @@ const WorkerManagement = () => {
           )}
         </div>
       </div>
-
-      {/* مودال إيداع المرتب */}
-      {showPayModal && selectedWorker && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-sm">
-            <h4 className="font-bold text-lg mb-4">إيداع مرتب لـ {selectedWorker.username}</h4>
-            <form onSubmit={handlePaySalary} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">المبلغ</label>
-                <input
-                  type="number"
-                  value={payAmount}
-                  onChange={e => setPayAmount(e.target.value)}
-                  className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50"
-                  placeholder="أدخل المبلغ"
-                  required
-                  min="1"
-                  step="0.01"
-                />
-              </div>
-              <div className="flex gap-3">
-                <button
-                  type="submit"
-                  className="flex-1 bg-green-600 text-white py-3 rounded-xl font-bold"
-                >
-                  تأكيد الإيداع
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setShowPayModal(false); setSelectedWorker(null); setPayAmount(''); }}
-                  className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-xl font-bold"
-                >
-                  إلغاء
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
