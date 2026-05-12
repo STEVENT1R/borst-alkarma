@@ -33,7 +33,7 @@ app.use(helmet());
 // CORS - restrict to known origins in production
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',')
-  : ['http://localhost:5173', 'http://localhost:3000', 'https://borstalkarma.vercel.app'];
+  : ['http://localhost:5173', 'http://localhost:3000', 'https://borstalkarma.vercel.app', 'https://borstalkarma-backend.vercel.app'];
 
 app.use(cors({
   origin: function (origin, callback) {
