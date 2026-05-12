@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
-import { UserPlus, Search, Plus, Minus, ArrowLeft, DollarSign, Package, CreditCard, HandCoins, BadgeDollarSign, Pencil, Calendar } from 'lucide-react';
+import { UserPlus, Search, Plus, Minus, ArrowLeft, DollarSign, Package, CreditCard, HandCoins, BadgeDollarSign, Pencil, Calendar, MapPin } from 'lucide-react';
 
 const ReceiversLog = () => {
   const { user } = useAuth();
@@ -21,6 +21,32 @@ const ReceiversLog = () => {
   const [payAmount, setPayAmount] = useState('');
   const [debtAmount, setDebtAmount] = useState('');
   const [message, setMessage] = useState({ type: '', text: '' });
+
+  const getGPSLocation = async (setter) => {
+    if (!navigator.geolocation) {
+      setMessage({ type: 'error', text: 'الـ GPS غير مدعوم في هذا الجهاز' });
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude, longitude } = pos.coords;
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&accept-language=ar`
+          );
+          const data = await res.json();
+          const address = data.display_name || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+          setter(prev => ({ ...prev, address }));
+          setMessage({ type: 'success', text: 'تم تحديد الموقع بنجاح' });
+        } catch {
+          setter(prev => ({ ...prev, address: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}` }));
+          setMessage({ type: 'success', text: 'تم تحديد الموقع (إحداثيات)' });
+        }
+      },
+      () => setMessage({ type: 'error', text: 'فشل الحصول على الموقع، تأكد من تشغيل GPS' }),
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
 
   const fetchReceivers = async () => {
     try {
@@ -247,16 +273,22 @@ const ReceiversLog = () => {
               <h4 className="font-bold text-lg mb-4">تعديل بيانات {selectedReceiver.name}</h4>
               <form onSubmit={handleEditReceiver} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">الاسم</label>
-                  <input value={editReceiver.name} onChange={e => setEditReceiver({...editReceiver, name: e.target.value})} className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50" required />
-                </div>
-                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">رقم الهاتف</label>
                   <input value={editReceiver.phone} onChange={e => setEditReceiver({...editReceiver, phone: e.target.value})} className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50" placeholder="أدخل رقم الهاتف" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">العنوان/الموقع</label>
-                  <input value={editReceiver.address} onChange={e => setEditReceiver({...editReceiver, address: e.target.value})} className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50" placeholder="مثال: شارع الجمهورية - المنصورة" />
+                  <div className="flex gap-2">
+                    <input value={editReceiver.address} onChange={e => setEditReceiver({...editReceiver, address: e.target.value})} className="flex-1 p-3 border border-gray-200 rounded-xl bg-gray-50" placeholder="أدخل العنوان يدوياً أو استخدم GPS" />
+                    <button
+                      type="button"
+                      onClick={() => getGPSLocation(setEditReceiver)}
+                      className="px-3 bg-blue-100 text-blue-600 rounded-xl hover:bg-blue-200 transition-colors flex items-center gap-1"
+                      title="تحديد الموقع الحالي"
+                    >
+                      <MapPin size={18} />
+                    </button>
+                  </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">ملاحظات</label>
@@ -328,7 +360,7 @@ const ReceiversLog = () => {
       ) : receivers.length === 0 ? (
         <p className="text-center text-gray-400">لا يوجد مستلمين</p>
       ) : (
-        receivers.map(r => (
+        [...receivers].sort((a, b) => a.name?.localeCompare(b.name, 'ar')).map(r => (
           <div key={r.id} className="bg-white p-4 rounded-2xl shadow-sm border mb-3">
             <div
               onClick={() => openReceiver(r)}
@@ -436,7 +468,17 @@ const ReceiversLog = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">العنوان/الموقع (اختياري)</label>
-                <input value={newReceiver.address} onChange={e => setNewReceiver({...newReceiver, address: e.target.value})} className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50" placeholder="مثال: شارع الجمهورية - المنصورة" />
+                <div className="flex gap-2">
+                  <input value={newReceiver.address} onChange={e => setNewReceiver({...newReceiver, address: e.target.value})} className="flex-1 p-3 border border-gray-200 rounded-xl bg-gray-50" placeholder="أدخل العنوان يدوياً أو استخدم GPS" />
+                  <button
+                    type="button"
+                    onClick={() => getGPSLocation(setNewReceiver)}
+                    className="px-3 bg-blue-100 text-blue-600 rounded-xl hover:bg-blue-200 transition-colors flex items-center gap-1"
+                    title="تحديد الموقع الحالي"
+                  >
+                    <MapPin size={18} />
+                  </button>
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">ملاحظات (اختياري)</label>

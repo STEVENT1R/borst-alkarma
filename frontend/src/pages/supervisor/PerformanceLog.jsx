@@ -6,7 +6,7 @@ import {
   Target, Trash2, Calculator, Plus, Edit3,
   Zap, CheckCircle, XCircle, RotateCw,
   CalendarDays, CalendarRange, ChevronDown, ChevronUp,
-  Scale
+  Scale, Printer
 } from 'lucide-react';
 
 const PRESETS = [
@@ -219,6 +219,23 @@ const PerformanceLog = () => {
 
   return (
     <div>
+      {/* استايلات الطباعة */}
+      <style>{`
+        @media print {
+          body * { visibility: hidden !important; }
+          #performance-report, #performance-report * { visibility: visible !important; }
+          #performance-report {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 10px !important;
+          }
+          #performance-report button { display: none !important; }
+          #performance-report .bg-gradient-to-br { break-inside: avoid !important; }
+        }
+      `}</style>
       <h3 className="text-2xl font-bold mb-6 text-gray-800 flex items-center gap-2">
         <Scale className="text-purple-600" size={28} /> الجرد والتقارير
       </h3>
@@ -270,16 +287,25 @@ const PerformanceLog = () => {
       )}
 
       {reportData && !reportLoading && (
-        <div className="space-y-4 mb-6">
-          {/* عنوان الفترة */}
-          <div className="bg-gradient-to-br from-purple-50 to-indigo-50 p-4 rounded-2xl shadow-sm border border-purple-100">
-            <div className="flex items-center gap-2 text-purple-700 mb-1">
-              <CalendarDays size={18} />
-              <span className="font-bold">تقرير الفترة</span>
+        <div className="space-y-4 mb-6" id="performance-report">
+          {/* عنوان الفترة + زرار الطباعة */}
+          <div className="flex items-center justify-between bg-gradient-to-br from-purple-50 to-indigo-50 p-4 rounded-2xl shadow-sm border border-purple-100">
+            <div>
+              <div className="flex items-center gap-2 text-purple-700 mb-1">
+                <CalendarDays size={18} />
+                <span className="font-bold">تقرير الفترة</span>
+              </div>
+              <div className="text-sm text-purple-600">
+                من {reportData.period?.start_date} إلى {reportData.period?.end_date}
+              </div>
             </div>
-            <div className="text-sm text-purple-600">
-              من {reportData.period?.start_date} إلى {reportData.period?.end_date}
-            </div>
+            <button
+              onClick={() => window.print()}
+              className="bg-purple-600 text-white p-3 rounded-xl hover:bg-purple-700 transition-colors flex items-center gap-1"
+              title="طباعة التقرير"
+            >
+              <Printer size={20} />
+            </button>
           </div>
 
           {/* النقدية - التغير */}
