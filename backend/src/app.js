@@ -33,7 +33,7 @@ app.use(helmet());
 // CORS - restrict to known origins in production
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',')
-  : ['http://localhost:5173', 'http://localhost:3000', 'https://borstalkarma.vercel.app', 'https://borstalkarma-backend.vercel.app'];
+  : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000', 'https://borstalkarma.vercel.app', 'https://borstalkarma-backend.vercel.app'];
 
 app.use(cors({
   origin: function (origin, callback) {
@@ -50,8 +50,8 @@ app.use(cors({
 
 app.use(express.json({ limit: '10mb' }));
 
-// Serve static files from the public folder (React build)
-app.use(express.static(path.join(__dirname, '../../public')));
+// Serve static files from the frontend build folder (React build)
+app.use(express.static(path.join(__dirname, '../../frontend/dist')));
 
 app.use('/api/users', userRoutes);
 
@@ -83,7 +83,7 @@ app.use(errorHandler);
 
 // For any route not matching an API endpoint, return the React app
 app.use((req, res) => {
-  res.sendFile(path.join(__dirname, '../../public/index.html'));
+  res.sendFile(path.join(__dirname, '../../frontend/dist/index.html'));
 });
 
 module.exports = app;

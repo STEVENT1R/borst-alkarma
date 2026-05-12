@@ -4,6 +4,7 @@ frontend/dist/
 *.log
 .DS_Store
 .vscode/
+.vercel/
 e
 nul
 ssh-key-*.key
