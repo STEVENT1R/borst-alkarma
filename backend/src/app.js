@@ -36,7 +36,7 @@ const app = express();
 // CORS must come before helmet to handle preflight properly
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',')
-  : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000', 'https://borstalkarma.vercel.app', 'https://borstalkarma-backend.vercel.app'];
+  : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000', 'https://borstalkarma.vercel.app', 'https://borstalkarma-backend.vercel.app', 'https://borstalkarma.netlify.app'];
 
 // Allow all origins in production on Vercel since the domain is fixed
 const isVercel = !!process.env.VERCEL || !!process.env.VERCEL_URL;
@@ -58,9 +58,6 @@ const corsOptions = isVercel
     };
 
 app.use(cors(corsOptions));
-
-// Handle OPTIONS preflight explicitly for all routes
-app.options('*', cors(corsOptions));
 
 // Security headers (after CORS)
 app.use(helmet());
@@ -91,7 +88,7 @@ app.use(async (req, res, next) => {
 
 // Serve static files from the frontend build folder (only locally, not on Vercel)
 const frontendDist = path.join(__dirname, '../../frontend/dist');
-if (fs.existsSync(frontendDist)) {
+if (!isVercel && fs.existsSync(frontendDist)) {
   app.use(express.static(frontendDist));
   console.log('✅ Serving frontend static files from frontend/dist');
 }

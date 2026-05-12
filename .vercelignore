@@ -1,3 +1,7 @@
 node_modules/
 .env
 *.log
+frontend/
+projects/
+google-services.json
+logo_no_bg.png

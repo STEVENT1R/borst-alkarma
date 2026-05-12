@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Use VITE_API_URL for production builds, /api proxy for development
 // Hardcoded production fallback in case .env is not available during Vercel build
-const PROD_API_URL = import.meta.env.VITE_API_URL || 'https://borstalkarma.vercel.app/_/backend/api';
+const PROD_API_URL = import.meta.env.VITE_API_URL || 'https://borstalkarma.vercel.app/api';
 const API_BASE = import.meta.env.PROD ? PROD_API_URL : '/api';
 
 const api = axios.create({

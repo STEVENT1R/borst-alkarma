@@ -1,13 +1,23 @@
 {
-  "experimentalServices": {
-    "frontend": {
-      "entrypoint": "frontend",
-      "routePrefix": "/",
-      "framework": "vite"
-    },
-    "backend": {
-      "entrypoint": "backend",
-      "routePrefix": "/_/backend"
+  "version": 2,
+  "framework": null,
+  "installCommand": "cd backend && npm install",
+  "buildCommand": "",
+  "outputDirectory": "backend",
+  "builds": [
+    {
+      "src": "backend/api/index.js",
+      "use": "@vercel/node"
     }
-  }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "backend/api/index.js"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "backend/api/index.js"
+    }
+  ]
 }
