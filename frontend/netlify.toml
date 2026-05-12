@@ -4,7 +4,7 @@
   base = "frontend"
 
 [build.environment]
-  NODE_VERSION = "18"
+  NODE_VERSION = "22"
   VITE_API_URL = "https://borstalkarma.vercel.app/api"
 
 [[redirects]]
