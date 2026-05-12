@@ -28,26 +28,37 @@ const workersLoadRoutes = require('./modules/workers_load/routes');
 const app = express();
 
 
-// Security headers
-app.use(helmet());
-
-// CORS - restrict to known origins in production
+// CORS must come before helmet to handle preflight properly
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',')
   : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000', 'https://borstalkarma.vercel.app', 'https://borstalkarma-backend.vercel.app'];
 
-app.use(cors({
-  origin: function (origin, callback) {
-    // Allow requests with no origin (server-to-server, mobile apps, curl)
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV === 'development') {
-      callback(null, true);
-    } else {
-      callback(new Error(`Origin ${origin} not allowed by CORS`));
+// Allow all origins in production on Vercel since the domain is fixed
+const isVercel = !!process.env.VERCEL || !!process.env.VERCEL_URL;
+const corsOptions = isVercel
+  ? {
+      origin: true, // Reflect the request origin
+      credentials: true,
     }
-  },
-  credentials: true
-}));
+  : {
+      origin: function (origin, callback) {
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV === 'development') {
+          callback(null, true);
+        } else {
+          callback(new Error(`Origin ${origin} not allowed by CORS`));
+        }
+      },
+      credentials: true,
+    };
+
+app.use(cors(corsOptions));
+
+// Handle OPTIONS preflight explicitly for all routes
+app.options('*', cors(corsOptions));
+
+// Security headers (after CORS)
+app.use(helmet());
 
 app.use(express.json({ limit: '10mb' }));
 

@@ -1,10 +1,13 @@
 /**
  * Database initialization script for Vercel cold starts
+ * Ensures all required tables exist before the first request is processed.
+ * Will throw on failure so the caller can return an appropriate error response.
  */
 const db = require('../src/config/db');
 
 module.exports = async function initDatabase() {
   try {
+    // Quick check if tables already exist to avoid expensive init on every cold start
     const tablesExist = await db.query("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'users')");
 
     await db.query(`CREATE TABLE IF NOT EXISTS users (
@@ -123,5 +126,6 @@ module.exports = async function initDatabase() {
     console.log('✅ Database initialized successfully');
   } catch (err) {
     console.error('❌ Database init error:', err.message);
+    throw err; // Re-throw so the blocking middleware in api/index.js can return a proper 500 error
   }
 };
