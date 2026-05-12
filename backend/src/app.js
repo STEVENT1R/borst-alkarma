@@ -6,7 +6,7 @@ require('dotenv').config();
 
 const path = require('path');
 const errorHandler = require('./middleware/errorHandler');
-const initDatabase = require('../api/init');
+const initDatabase = require('./initDb');
 
 // Track DB initialization state
 let dbInitialized = false;
