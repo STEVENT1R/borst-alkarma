@@ -111,7 +111,7 @@ const ProfitLog = () => {
         <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-4 rounded-2xl shadow-sm border border-green-100">
           <div className="text-xs text-gray-500">صافي الربح (محاسبي)</div>
           <div className="text-lg font-extrabold text-green-700">{formatCurrency(summaryData.total_profit)} ج.م</div>
-          <div className="text-[10px] text-gray-400 mt-0.5">قيمة المهمات كلها - التكلفة</div>
+          <div className="text-[10px] text-gray-400 mt-0.5">ربح المهام + مبيعات المحلات - التكلفة - المصروفات</div>
         </div>
         <div className="bg-gradient-to-br from-teal-50 to-cyan-50 p-4 rounded-2xl shadow-sm border border-teal-100">
           <div className="text-xs text-gray-500">النقدية (الخزنة)</div>

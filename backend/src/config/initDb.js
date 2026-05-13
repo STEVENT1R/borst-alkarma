@@ -111,11 +111,11 @@ const createTables = async () => {
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
 
-      -- تعديل CHECK constraint في profit_log
+      -- تعديل CHECK constraint في profit_log ليشمل sale_revenue
       DO $$ BEGIN
         ALTER TABLE profit_log DROP CONSTRAINT IF EXISTS profit_log_entry_type_check;
         ALTER TABLE profit_log ADD CONSTRAINT profit_log_entry_type_check 
-          CHECK (entry_type IN ('profit','salary_payment','spoilage','expense','revenue','purchase','cogs','opening_balance'));
+          CHECK (entry_type IN ('profit','salary_payment','spoilage','expense','revenue','purchase','cogs','opening_balance','sale_revenue'));
       END $$;
 
       -- إضافة عمود notes لجدول tasks لو مش موجود
@@ -201,6 +201,8 @@ const createTables = async () => {
         id SERIAL PRIMARY KEY,
         supplier_name VARCHAR(200) NOT NULL,
         total_amount DECIMAL(10,2) NOT NULL,
+        paid_amount DECIMAL(10,2) DEFAULT 0,
+        payment_status VARCHAR(20) DEFAULT 'unpaid' CHECK (payment_status IN ('unpaid','partial','paid')),
         notes TEXT,
         purchase_date TIMESTAMPTZ DEFAULT NOW(),
         created_at TIMESTAMPTZ DEFAULT NOW()

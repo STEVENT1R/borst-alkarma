@@ -47,11 +47,12 @@ router.get('/balance', auth, role('supervisor'), async (req, res) => {
     const { date } = req.query;
     let query = `
       SELECT
-        COALESCE(SUM(CASE WHEN entry_type IN ('revenue', 'sale_revenue') THEN amount ELSE 0 END), 0) as total_in,
+        COALESCE(SUM(CASE WHEN entry_type IN ('revenue', 'sale_revenue', 'opening_balance') THEN amount ELSE 0 END), 0) as total_in,
         COALESCE(SUM(CASE WHEN entry_type IN ('salary_payment', 'spoilage', 'expense', 'purchase') THEN amount ELSE 0 END), 0) as total_out,
+        -- balance = cash in - cash out (profit مش نقدي، ملوش دعوة بالخزنة)
         COALESCE(SUM(
           CASE 
-            WHEN entry_type IN ('revenue', 'sale_revenue') THEN amount
+            WHEN entry_type IN ('revenue', 'sale_revenue', 'opening_balance') THEN amount
             WHEN entry_type IN ('salary_payment', 'spoilage', 'expense', 'purchase') THEN -amount
             ELSE 0
           END

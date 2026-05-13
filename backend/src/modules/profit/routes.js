@@ -30,8 +30,7 @@ router.get('/summary', auth, role('supervisor'), async (req, res) => {
         COALESCE(SUM(CASE WHEN entry_type = 'spoilage' THEN amount ELSE 0 END), 0) as total_spoilage,
         COALESCE(SUM(CASE WHEN entry_type = 'expense' THEN amount ELSE 0 END), 0) as total_expenses,
         COALESCE(SUM(CASE WHEN entry_type = 'purchase' THEN amount ELSE 0 END), 0) as total_purchases,
-        -- صافي الربح = قيمة المهمات كاملة (profit) - تكلفة البضاعة المباعة (cogs)
-        -- profit = قيمة المهمة كاملة (ملوش دعوة اتحصنت كام)، cogs = التكلفة
+        -- صافي الربح = إجمالي الربح (profit) - تكلفة البضاعة (cogs) + مبيعات المحلات - المصروفات - المرتبات - الهالك
         COALESCE(SUM(
           CASE 
             WHEN entry_type = 'profit' THEN amount
@@ -40,8 +39,8 @@ router.get('/summary', auth, role('supervisor'), async (req, res) => {
             ELSE 0
           END
         ), 0) as total_profit,
-        -- النقدية = الإيراد النقدي الفعلي - المصروفات النقدية
-        -- (profit مش نقدي، ده بند محاسبي)
+        -- النقدية (السيولة) = الإيراد النقدي الفعلي - المصروفات النقدية
+        -- ملاحظة: profit مش نقدي - ده قيمة بضاعة اتباعت بالأجل، مش فلوس دخلت الخزنة
         COALESCE(SUM(
           CASE 
             WHEN entry_type IN ('revenue', 'sale_revenue', 'opening_balance') THEN amount
@@ -69,7 +68,7 @@ router.get('/today', auth, role('supervisor'), async (req, res) => {
   try {
     const result = await db.query(`
       SELECT
-        -- صافي الإيراد اليوم = الإيراد النقدي الفعلي - المصروفات - المرتبات - الهالك
+        -- صافي الإيراد اليوم = الإيراد النقدي الفعلي - المصروفات - المرتبات - الهالك (مش شامل المشتريات)
         COALESCE(SUM(
           CASE 
             WHEN entry_type IN ('revenue', 'sale_revenue') THEN amount
@@ -77,7 +76,7 @@ router.get('/today', auth, role('supervisor'), async (req, res) => {
             ELSE 0
           END
         ), 0) as net_revenue_today,
-        -- صافي الربح اليوم = قيمة المهمات (profit) - تكلفة البضاعة - المصروفات - المرتبات - الهالك
+        -- صافي الربح اليوم = قيمة المهمات (profit) + مبيعات المحلات - تكلفة البضاعة - المصروفات - المرتبات - الهالك
         COALESCE(SUM(
           CASE 
             WHEN entry_type = 'profit' THEN amount

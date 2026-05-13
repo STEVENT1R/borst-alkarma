@@ -9,12 +9,14 @@ router.get('/', auth, role('supervisor'), async (req, res) => {
   try {
     const profitSummary = await db.query(`
       SELECT
-        COALESCE(SUM(CASE WHEN entry_type IN ('revenue', 'profit', 'sale_revenue') THEN amount ELSE 0 END), 0) as total_income,
+        COALESCE(SUM(CASE WHEN entry_type IN ('revenue', 'sale_revenue') THEN amount ELSE 0 END), 0) as total_income,
         COALESCE(SUM(CASE WHEN entry_type IN ('salary_payment','spoilage','expense','purchase') THEN amount ELSE 0 END), 0) as total_outcome,
-        -- صافي الربح = الإيرادات + الربح اليدوي - تكلفة البضاعة - المصروفات - المرتبات - الهالك
+        -- صافي الربح = ربح المهام + مبيعات المحلات - تكلفة البضاعة - المصروفات - المرتبات - الهالك
+        -- (revenue مش ربح، ده فلوس اتحصنت)
         COALESCE(SUM(
           CASE 
-            WHEN entry_type IN ('revenue', 'profit', 'sale_revenue') THEN amount
+            WHEN entry_type = 'profit' THEN amount
+            WHEN entry_type = 'sale_revenue' THEN amount
             WHEN entry_type IN ('cogs', 'salary_payment', 'spoilage', 'expense') THEN -amount
             ELSE 0
           END
@@ -110,20 +112,23 @@ router.post('/log/calculate', auth, role('supervisor'), async (req, res) => {
     // حساب المؤشرات المالية لليوم ده
     const financial = await db.query(`
       SELECT
-        COALESCE(SUM(CASE WHEN entry_type IN ('revenue', 'profit', 'sale_revenue') THEN amount ELSE 0 END), 0) as total_income,
+        -- إجمالي الدخل النقدي = الإيرادات النقدية + مبيعات المحلات
+        COALESCE(SUM(CASE WHEN entry_type IN ('revenue', 'sale_revenue') THEN amount ELSE 0 END), 0) as total_income,
         COALESCE(SUM(CASE WHEN entry_type IN ('salary_payment','spoilage','expense','purchase') THEN amount ELSE 0 END), 0) as total_expenses,
-        -- صافي الربح = الإيرادات + الربح اليدوي - تكلفة البضاعة - المصروفات - المرتبات - الهالك
+        -- صافي الربح = ربح المهام + مبيعات المحلات - تكلفة البضاعة - المصروفات - المرتبات - الهالك
+        -- (revenue مش ربح، ده فلوس اتحصنت)
         COALESCE(SUM(
           CASE 
-            WHEN entry_type IN ('revenue', 'profit', 'sale_revenue') THEN amount
+            WHEN entry_type = 'profit' THEN amount
+            WHEN entry_type = 'sale_revenue' THEN amount
             WHEN entry_type IN ('cogs', 'salary_payment', 'spoilage', 'expense') THEN -amount
             ELSE 0
           END
         ), 0) as net_profit,
-        -- السيولة = كل الداخل - كل الخارج (بما في ذلك المشتريات)
+        -- السيولة = الدخل النقدي الفعلي - المصروفات النقدية (profit مش نقدي)
         COALESCE(SUM(
           CASE 
-            WHEN entry_type IN ('revenue', 'profit', 'sale_revenue') THEN amount
+            WHEN entry_type IN ('revenue', 'sale_revenue') THEN amount
             WHEN entry_type IN ('salary_payment', 'spoilage', 'expense', 'purchase') THEN -amount
             ELSE 0
           END
@@ -329,8 +334,8 @@ router.get('/period', auth, role('supervisor'), async (req, res) => {
     // حساب مؤشرات الفترة المالية
     const financial = await db.query(`
       SELECT
-        -- إجمالي الدخل = الإيرادات + الربح اليدوي + مبيعات
-        COALESCE(SUM(CASE WHEN entry_type IN ('revenue', 'profit', 'sale_revenue') THEN amount ELSE 0 END), 0) as total_income,
+        -- إجمالي الدخل النقدي = الإيرادات النقدية + مبيعات المحلات (كاش فقط، مش ربح تقديري)
+        COALESCE(SUM(CASE WHEN entry_type IN ('revenue', 'sale_revenue') THEN amount ELSE 0 END), 0) as total_income,
         -- المصروفات
         COALESCE(SUM(CASE WHEN entry_type = 'expense' THEN amount ELSE 0 END), 0) as expenses,
         -- المرتبات
@@ -341,20 +346,23 @@ router.get('/period', auth, role('supervisor'), async (req, res) => {
         COALESCE(SUM(CASE WHEN entry_type = 'cogs' THEN amount ELSE 0 END), 0) as cogs,
         -- المشتريات
         COALESCE(SUM(CASE WHEN entry_type = 'purchase' THEN amount ELSE 0 END), 0) as purchase_cost,
-        -- إجمالي الخسائر = المصروفات + المرتبات + الهالك + المشتريات
-        COALESCE(SUM(CASE WHEN entry_type IN ('expense', 'salary_payment', 'spoilage', 'purchase') THEN amount ELSE 0 END), 0) as total_losses,
-        -- صافي الإيراد = إجمالي الدخل - المصروفات - المرتبات - الهالك
+        -- إجمالي الخسائر = المصروفات + المرتبات + الهالك (المشتريات مش خسارة، دي أصول)
+        COALESCE(SUM(CASE WHEN entry_type IN ('expense', 'salary_payment', 'spoilage') THEN amount ELSE 0 END), 0) as total_losses,
+        -- صافي الإيراد = الإيرادات النقدية + مبيعات المحلات - المصروفات - المرتبات - الهالك
+        -- (profit مش نقدي، ده قيمة البضاعة اللي اتباعت بالأجل)
         COALESCE(SUM(
           CASE 
-            WHEN entry_type IN ('revenue', 'profit', 'sale_revenue') THEN amount
+            WHEN entry_type IN ('revenue', 'sale_revenue') THEN amount
             WHEN entry_type IN ('expense', 'salary_payment', 'spoilage') THEN -amount
             ELSE 0
           END
         ), 0) as net_revenue,
-        -- صافي الربح = إجمالي الدخل - cogs - المصروفات - المرتبات - الهالك
+        -- صافي الربح = ربح المهام + مبيعات المحلات - تكلفة البضاعة - المصروفات - المرتبات - الهالك
+        -- (revenue مش ربح، ده فلوس اتحصنت - الربح الحقيقي هو profit - cogs)
         COALESCE(SUM(
           CASE 
-            WHEN entry_type IN ('revenue', 'profit', 'sale_revenue') THEN amount
+            WHEN entry_type = 'profit' THEN amount
+            WHEN entry_type = 'sale_revenue' THEN amount
             WHEN entry_type IN ('cogs', 'expense', 'salary_payment', 'spoilage') THEN -amount
             ELSE 0
           END
@@ -368,10 +376,11 @@ router.get('/period', auth, role('supervisor'), async (req, res) => {
 
     // حساب تغير النقدية = السيولة في نهاية الفترة - السيولة في بداية الفترة
     // الرصيد التراكمي قبل بداية الفترة
+    // ملاحظة: profit مش نقدي - ده قيمة بضاعة اتباعت بالأجل، مش فلوس دخلت الخزنة
     const liquidityBefore = await db.query(`
       SELECT COALESCE(SUM(
         CASE 
-          WHEN entry_type IN ('revenue', 'profit', 'sale_revenue', 'opening_balance') THEN amount
+          WHEN entry_type IN ('revenue', 'sale_revenue', 'opening_balance') THEN amount
           WHEN entry_type IN ('salary_payment', 'spoilage', 'expense', 'purchase') THEN -amount
           ELSE 0
         END
@@ -384,7 +393,7 @@ router.get('/period', auth, role('supervisor'), async (req, res) => {
     const liquidityAfter = await db.query(`
       SELECT COALESCE(SUM(
         CASE 
-          WHEN entry_type IN ('revenue', 'profit', 'sale_revenue', 'opening_balance') THEN amount
+          WHEN entry_type IN ('revenue', 'sale_revenue', 'opening_balance') THEN amount
           WHEN entry_type IN ('salary_payment', 'spoilage', 'expense', 'purchase') THEN -amount
           ELSE 0
         END
@@ -522,8 +531,10 @@ router.get('/period', auth, role('supervisor'), async (req, res) => {
       debts: {
         // لينا عند الناس (المستلمين مديونين لنا)
         owed_to_us: parseFloat(rd.total_owed_to_us || 0).toFixed(1),
-        collected: parseFloat(rd.total_collected || 0).toFixed(1),
-        net_receivable: (parseFloat(rd.total_owed_to_us || 0) - parseFloat(rd.total_collected || 0)).toFixed(1),
+        // collected is stored as negative in receiver_transactions, so we convert to positive for display
+        collected: Math.abs(parseFloat(rd.total_collected || 0)).toFixed(1),
+        // net_receivable = المديونية المتبقية = total_owed (positive) + total_collected (negative)
+        net_receivable: Math.max(0, parseFloat(rd.total_owed_to_us || 0) + parseFloat(rd.total_collected || 0)).toFixed(1),
         // علينا للموردين (مديونية المشتريات)
         purchase_debt: parseFloat(pd.remaining_debt || 0).toFixed(1),
         unpaid_invoices: parseInt(pd.unpaid_invoices) || 0,

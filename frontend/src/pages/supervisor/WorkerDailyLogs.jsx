@@ -146,8 +146,11 @@ const WorkerDailyLogs = () => {
                     .map((log, dayIdx) => {
                       const dayKey = `${worker.worker_id}-${log.log_date}`;
                       const isDayExpanded = expandedDay === dayKey;
-                      const dateParts = log.log_date ? log.log_date.split('-') : [];
-                      const dateStr = dateParts.length === 3 ? `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}` : log.log_date;
+                      const dateStr = log.log_date
+                        ? new Date(log.log_date.split('T')[0] + 'T00:00:00').toLocaleDateString('ar-EG', {
+                            year: 'numeric', month: 'numeric', day: 'numeric'
+                          })
+                        : '';
 
                       const startSnap = log.start_snapshot;
                       const endSnap = log.end_snapshot;
