@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useRegisterRefresh } from '../../context/RefreshContext';
 import api from '../../services/api';
 import { Wallet, TrendingUp, TrendingDown, DollarSign, Calendar, ArrowLeft, RefreshCw, AlertTriangle, ChevronLeft } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
@@ -14,7 +15,7 @@ const CashFlowLog = () => {
   const [days, setDays] = useState(30);
   const [expandedDay, setExpandedDay] = useState(null);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -35,9 +36,11 @@ const CashFlowLog = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [days]);
 
-  useEffect(() => { fetchData(); }, [days]);
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  useRegisterRefresh(fetchData);
 
   const formatCurrency = (val) => {
     const n = parseFloat(val) || 0;

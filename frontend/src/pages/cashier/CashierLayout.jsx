@@ -7,22 +7,21 @@ import CashierSettings from './CashierSettings';
 import Notifications from '../common/Notifications';
 import BottomNav from '../../components/BottomNav';
 import TopBar from '../../components/TopBar';
+import PullToRefresh from '../../components/PullToRefresh';
 
 const CashierLayout = () => (
   <div className="h-screen flex flex-col">
     <TopBar />
-    <div className="flex-1 overflow-y-auto pb-20">
-      <div className="p-4 max-w-lg mx-auto">
-        <Routes>
-          <Route index element={<CashierDashboard />} />
-          <Route path="sales" element={<CashierSales />} />
-          <Route path="inventory" element={<CashierInventory />} />
-          <Route path="logs" element={<CashierLogs />} />
-          <Route path="notifications" element={<Notifications />} />
-          <Route path="settings" element={<CashierSettings />} />
-        </Routes>
-      </div>
-    </div>
+    <PullToRefresh>
+      <Routes>
+        <Route index element={<CashierDashboard />} />
+        <Route path="sales" element={<CashierSales />} />
+        <Route path="inventory" element={<CashierInventory />} />
+        <Route path="logs" element={<CashierLogs />} />
+        <Route path="notifications" element={<Notifications />} />
+        <Route path="settings" element={<CashierSettings />} />
+      </Routes>
+    </PullToRefresh>
     <BottomNav />
   </div>
 );

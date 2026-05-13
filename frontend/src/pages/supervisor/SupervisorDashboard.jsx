@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useRegisterRefresh } from '../../context/RefreshContext';
 import api from '../../services/api';
 import { TrendingUp, TrendingDown, Wallet, Calendar, MinusCircle, DollarSign, AlertTriangle, Briefcase, Database, Users } from 'lucide-react';
 
@@ -18,46 +19,49 @@ const SupervisorDashboard = () => {
   const [totalWeOwe, setTotalWeOwe] = useState('0');
   const [totalWeAreOwed, setTotalWeAreOwed] = useState('0');
 
+  const fetchData = useCallback(async () => {
+    // جلب بيانات اليوم (صافي الإيراد اليوم + صافي الربح اليوم)
+    try {
+      const todayRes = await api.get('/profit/today');
+      setTodayData(todayRes.data);
+    } catch(e) { console.error('Today data error:', e); }
+
+    // المهام النشطة
+    try {
+      const tasksRes = await api.get('/tasks');
+      const terminalStatuses = ['completed', 'cancelled', 'delivered', 'loaded', 'delivered_and_loaded'];
+      const active = tasksRes.data.filter(t => !terminalStatuses.includes(t.status));
+      setActiveTasks(active.length);
+    } catch(e) {}
+
+    try {
+      const invRes = await api.get('/inventory');
+      setLowStock(invRes.data.filter(p => p.quantity < 5).length);
+    } catch(e) {}
+
+    try {
+      const debtRes = await api.get('/receivers/summary');
+      setTotalWeAreOwed(parseFloat(debtRes.data.total_we_are_owed || 0).toFixed(1));
+      const purchaseDebtRes = await api.get('/purchases/debt');
+      setTotalWeOwe((parseFloat(debtRes.data.total_we_owe) + parseFloat(purchaseDebtRes.data.total_purchase_debt)).toFixed(1));
+    } catch(e) {}
+
+    try {
+      const profitRes = await api.get('/profit/summary');
+      setLiquidity(profitRes.data.current_liquidity);
+      setInventoryValue(profitRes.data.inventory_value);
+    } catch(e) {}
+  }, []);
+
   useEffect(() => {
-    const fetchData = async () => {
-      // جلب بيانات اليوم (صافي الإيراد اليوم + صافي الربح اليوم)
-      try {
-        const todayRes = await api.get('/profit/today');
-        setTodayData(todayRes.data);
-      } catch(e) { console.error('Today data error:', e); }
-
-      // المهام النشطة
-      try {
-        const tasksRes = await api.get('/tasks');
-        const terminalStatuses = ['completed', 'cancelled', 'delivered', 'loaded', 'delivered_and_loaded'];
-        const active = tasksRes.data.filter(t => !terminalStatuses.includes(t.status));
-        setActiveTasks(active.length);
-      } catch(e) {}
-
-      try {
-        const invRes = await api.get('/inventory');
-        setLowStock(invRes.data.filter(p => p.quantity < 5).length);
-      } catch(e) {}
-
-      try {
-        const debtRes = await api.get('/receivers/summary');
-        setTotalWeAreOwed(parseFloat(debtRes.data.total_we_are_owed || 0).toFixed(1));
-        const purchaseDebtRes = await api.get('/purchases/debt');
-        setTotalWeOwe((parseFloat(debtRes.data.total_we_owe) + parseFloat(purchaseDebtRes.data.total_purchase_debt)).toFixed(1));
-      } catch(e) {}
-
-      try {
-        const profitRes = await api.get('/profit/summary');
-        setLiquidity(profitRes.data.current_liquidity);
-        setInventoryValue(profitRes.data.inventory_value);
-      } catch(e) {}
-    };
     fetchData();
     
     // تحديث كل 30 ثانية
     const interval = setInterval(fetchData, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [fetchData]);
+
+  useRegisterRefresh(fetchData);
 
   const { net_revenue_today, net_profit_today, gross_revenue_today, spoilage_today, expenses_today, salaries_today } = todayData;
 

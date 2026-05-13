@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useRegisterRefresh } from '../../context/RefreshContext';
 import api from '../../services/api';
 import { ShoppingCart, Package, DollarSign, TrendingUp, ClipboardList } from 'lucide-react';
 
@@ -9,11 +10,7 @@ const CashierDashboard = () => {
   const [inventoryCount, setInventoryCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
-
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     try {
       const [todayRes, inventoryRes] = await Promise.all([
         api.get('/sales/today'),
@@ -33,7 +30,13 @@ const CashierDashboard = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
+
+  useRegisterRefresh(fetchDashboardData);
 
   return (
     <div>

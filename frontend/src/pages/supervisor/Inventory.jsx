@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useRegisterRefresh } from '../../context/RefreshContext';
 import api from '../../services/api';
 import { Package, Plus, Trash2, Weight, Hash, AlertTriangle, AlertCircle, XCircle } from 'lucide-react';
 
@@ -10,9 +11,11 @@ const Inventory = () => {
   const [editMinStock, setEditMinStock] = useState({ id: null, value: '' });
   const [spoilageForm, setSpoilageForm] = useState({ show: false, product: null, quantity: '', description: '' });
 
-  const fetchProducts = () => api.get('/inventory').then(res => setProducts(res.data)).catch(() => {});
+  const fetchProducts = useCallback(() => api.get('/inventory').then(res => setProducts(res.data)).catch(() => {}), []);
 
-  useEffect(() => { fetchProducts(); }, []);
+  useEffect(() => { fetchProducts(); }, [fetchProducts]);
+
+  useRegisterRefresh(fetchProducts);
 
   const handleSpoilage = async (e) => {
     e.preventDefault();

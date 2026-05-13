@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useRegisterRefresh } from '../../context/RefreshContext';
 import api from '../../services/api';
 import { Briefcase, DollarSign, Package, Landmark } from 'lucide-react';
 
@@ -9,7 +10,7 @@ const WorkerDashboard = () => {
   const [loadItems, setLoadItems] = useState([]);
   const [lastPayment, setLastPayment] = useState(null);
 
-  useEffect(() => {
+  const fetchData = useCallback(async () => {
     // المهام النشطة
     api.get('/tasks')
       .then(res => {
@@ -40,6 +41,12 @@ const WorkerDashboard = () => {
       })
       .catch(console.error);
   }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  useRegisterRefresh(fetchData);
 
   return (
     <div>

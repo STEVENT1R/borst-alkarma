@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { RefreshProvider } from './context/RefreshContext';
 import Login from './pages/auth/Login';
 import WorkerLayout from './pages/worker/WorkerLayout';
 import SupervisorLayout from './pages/supervisor/Layout';
@@ -34,7 +35,9 @@ function App() {
     <ThemeProvider>
       <AuthProvider>
         <Router>
-          <AppRoutes />
+          <RefreshProvider>
+            <AppRoutes />
+          </RefreshProvider>
         </Router>
       </AuthProvider>
     </ThemeProvider>
