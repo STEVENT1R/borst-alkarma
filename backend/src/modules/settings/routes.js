@@ -174,6 +174,18 @@ router.post('/clear-all-data', auth, role('supervisor'), async (req, res) => {
     const sales = await db.query('DELETE FROM sales');
     deleted.sales = sales.rowCount;
 
+    // جداول العهد والحمولات
+    const workerLoad = await db.query('DELETE FROM worker_load');
+    deleted.worker_load = workerLoad.rowCount;
+    const workerCashCustody = await db.query('DELETE FROM worker_cash_custody');
+    deleted.worker_cash_custody = workerCashCustody.rowCount;
+    const workerDailyLog = await db.query('DELETE FROM worker_daily_log');
+    deleted.worker_daily_log = workerDailyLog.rowCount;
+
+    // تصفير الرصيد النقدي والعهدة لجميع المستخدمين (بيانات العهدة)
+    const resetBalance = await db.query('UPDATE users SET cash_balance = 0');
+    deleted.users_reset_cash_balance = resetBalance.rowCount;
+
     // الحسابات (users) لم يتم حذفها - تم الاحتفاظ بها بالكامل
 
     console.log('✅ تم مسح جميع البيانات بنجاح مع الاحتفاظ بالحسابات');

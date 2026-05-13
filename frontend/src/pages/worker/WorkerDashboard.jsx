@@ -6,6 +6,7 @@ const WorkerDashboard = () => {
   const [tasksCount, setTasksCount] = useState(0);
   const [cashBalance, setCashBalance] = useState(0);
   const [goodsValue, setGoodsValue] = useState(0);
+  const [loadItems, setLoadItems] = useState([]);
   const [lastPayment, setLastPayment] = useState(null);
 
   useEffect(() => {
@@ -26,6 +27,7 @@ const WorkerDashboard = () => {
       .then(loadRes => {
         setCashBalance(loadRes.data.cash_balance || 0);
         setGoodsValue(loadRes.data.total_goods_value || 0);
+        setLoadItems(loadRes.data.load || []);
       })
       .catch(console.error);
 
@@ -86,6 +88,27 @@ const WorkerDashboard = () => {
           )}
         </div>
       </div>
+
+      {/* المنتجات في العهدة */}
+      {loadItems.length > 0 && (
+        <div className="mt-6">
+          <h4 className="text-lg font-bold text-gray-700 mb-3 flex items-center gap-2">
+            <Package size={20} className="text-amber-600" />
+            المنتجات في العهدة
+          </h4>
+          <div className="space-y-2">
+            {[...loadItems].sort((a, b) => a.product_name?.localeCompare(b.product_name, 'ar')).map((item, i) => (
+              <div key={i} className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center">
+                <span className="font-semibold text-gray-800">{item.product_name}</span>
+                <span className="text-lg font-bold text-amber-700">
+                  {parseFloat(item.quantity).toFixed(1)}
+                  <span className="text-xs mr-1 text-gray-400">{item.unit_type === 'weight' ? 'كجم' : 'قطعة'}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

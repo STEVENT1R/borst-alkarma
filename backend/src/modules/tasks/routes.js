@@ -24,39 +24,11 @@ router.post('/', auth, async (req, res) => {
     const finalQuantity = parseFloat(quantity) || 0;
     const finalUnitType = unit_type || 'unit';
 
-    if (finalProductName && finalQuantity > 0) {
-      if (from_load) {
-        // المنتج من حمولة العامل (موجود فعلاً معاه)
-        const loadItem = await db.query(
-          'SELECT * FROM worker_load WHERE worker_id = $1 AND product_name = $2',
-          [finalWorkerId, finalProductName]
-        );
-        if (loadItem.rows.length === 0) {
-          return res.status(400).json({ error: `المنتج "${finalProductName}" غير موجود في عهدة العامل` });
-        }
-        const loadQty = parseFloat(loadItem.rows[0].quantity) || 0;
-        if (finalQuantity > loadQty) {
-          return res.status(400).json({ error: `الكمية المطلوبة (${finalQuantity}) أكبر من المتاح في العهدة (${loadQty})` });
-        }
-        // مش بنخصم من العهدة دلوقتي - الخصم هيحصل وقت التسليم (delivery)
-        // عشان العامل ممكن يلغي المهمة قبل التنفيذ
-      } else {
-        // المنتج من المخزون العام (لأول مرة)
-        const inv = await db.query('SELECT id, quantity, unit_type FROM inventory WHERE product_name = $1', [finalProductName]);
-        if (inv.rows.length === 0) {
-          return res.status(400).json({ error: `المنتج "${finalProductName}" غير موجود في المخزون` });
-        }
-        const availableQty = parseFloat(inv.rows[0].quantity) || 0;
-        if (finalQuantity > availableQty) {
-          return res.status(400).json({ error: `الكمية المطلوبة (${finalQuantity}) أكبر من المتاح في المخزون (${availableQty})` });
-        }
-        // خصم من المخزون
-        await db.query(
-          'UPDATE inventory SET quantity = quantity - $1, updated_at = NOW() WHERE product_name = $2',
-          [finalQuantity, finalProductName]
-        );
-      }
-    }
+    // المهمة هي للتذكير فقط - مش بنأثر على المخزون ولا على عهدة العامل
+    // العهدة بتتزود فقط من خلال "إضافة عهدة" (give-load) مش من المهام
+    // if (finalProductName && finalQuantity > 0) {
+    //   // التحقق من صحة البيانات فقط بدون تغيير في المخزون أو العهدة
+    // }
 
     const result = await db.query(
       `INSERT INTO tasks (supervisor_id, worker_id, title, receiver_name, product_name, quantity, unit_type, price, reminder_time, sale_type, notes)
@@ -65,31 +37,6 @@ router.post('/', auth, async (req, res) => {
     );
 
     const task = result.rows[0];
-
-    // نقل البضاعة لحمولة العامل (فقط لو المخزون العام مش لو from_load)
-    if (!from_load && finalProductName && finalQuantity > 0 && finalWorkerId) {
-      const existingLoad = await db.query(
-        'SELECT * FROM worker_load WHERE worker_id = $1 AND product_name = $2',
-        [finalWorkerId, finalProductName]
-      );
-      if (existingLoad.rows.length > 0) {
-        await db.query(
-          'UPDATE worker_load SET quantity = quantity + $1, updated_at = NOW() WHERE worker_id = $2 AND product_name = $3',
-          [finalQuantity, finalWorkerId, finalProductName]
-        );
-      } else {
-        await db.query(
-          'INSERT INTO worker_load (worker_id, product_name, quantity, unit_type) VALUES ($1, $2, $3, $4)',
-          [finalWorkerId, finalProductName, finalQuantity, finalUnitType]
-        );
-      }
-      // تسجيل حركة مخزون
-      await db.query(
-        `INSERT INTO inventory_transactions (product_name, user_id, task_id, quantity_change, transaction_type)
-         VALUES ($1, $2, $3, $4, 'deduction')`,
-        [finalProductName, req.user.id, task.id, -finalQuantity]
-      );
-    }
 
     // إشعار العامل
     await db.query(
@@ -708,6 +655,19 @@ router.post('/:id/complete', auth, async (req, res) => {
              VALUES ($1, $2, 'money_received', $3, $4)`,
             [receiverId, id, -finalAmountPaid, `استلام أموال من ${finalReceiverName} - ${task.title}`]
           );
+          
+          // الفلوس تروح لعهدة العامل (هو اللي جمعها) - إضافة لرصيده المالي
+          if (task.worker_id) {
+            await db.query(
+              'UPDATE users SET cash_balance = cash_balance + $1 WHERE id = $2',
+              [finalAmountPaid, task.worker_id]
+            );
+            await db.query(
+              `INSERT INTO worker_cash_custody (worker_id, amount, type, description, reference_type, reference_id)
+               VALUES ($1, $2, 'collected_from_tasks', $3, 'task', $4)`,
+              [task.worker_id, finalAmountPaid, `تحصيل فلوس من ${finalReceiverName} - ${task.title}`, id]
+            );
+          }
         }
         
         // تسجيل الربح بقيمة المهمة كاملة (الربح ملوش دعوه بالاجل، حتى لو العميل مديون)

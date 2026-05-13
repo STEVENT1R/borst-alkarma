@@ -22,10 +22,13 @@ const CreateTask = () => {
   const [message, setMessage] = useState({ type: '', text: '' });
   const [loading, setLoading] = useState(false);
 
-  // إحضار سعر الشراء للمنتج المختار والكمية المتاحة في المخزون
+  // إحضار سعر الشراء للمنتج المختار
+  // availableQuantity: من عهدة العامل المختار مش من المخزون العام (المهمة للتذكير)
+  const [workerLoadProducts, setWorkerLoadProducts] = useState([]);
   const selectedProduct = products.find(p => p.product_name === form.product_name) || null;
+  const selectedLoadProduct = workerLoadProducts.find(p => p.product_name === form.product_name) || null;
   const purchasePrice = selectedProduct ? parseFloat(selectedProduct.purchase_price || 0) : 0;
-  const availableQuantity = selectedProduct ? parseFloat(selectedProduct.quantity || 0) : 0;
+  const availableQuantity = form.worker_id ? (selectedLoadProduct ? parseFloat(selectedLoadProduct.quantity || 0) : 0) : (selectedProduct ? parseFloat(selectedProduct.quantity || 0) : 0);
   const quantity = parseFloat(form.quantity) || 0;
   const unitSellingPrice = parseFloat(form.unit_selling_price) || 0;
 
@@ -37,9 +40,10 @@ const CreateTask = () => {
   // دالة لعرض الأرقام: للعدد → صحيح، للوزن → رقم عشري واحد
   const fmt = (num) => form.unit_type === 'weight' ? num.toFixed(1) : Math.floor(num) === num ? num.toString() : num.toFixed(1);
 
-  // التحقق من الكمية المتاحة
-  const quantityError = form.product_name && form.quantity && parseFloat(form.quantity) > availableQuantity
-    ? `الكمية المتاحة في المخزون: ${fmt(availableQuantity)} ${form.unit_type === 'weight' ? 'كجم' : 'قطعة'}`
+  // تحذير فقط - مش مانع (المهمة للتذكير فقط)
+  const loadLabel = form.worker_id && form.worker_id !== user.id ? 'في عهدة العامل' : 'في المخزون';
+  const quantityWarning = form.product_name && form.quantity && parseFloat(form.quantity) > availableQuantity
+    ? `⚠️ الكمية المتاحة ${loadLabel} (${fmt(availableQuantity)} ${form.unit_type === 'weight' ? 'كجم' : 'قطعة'}) أقل من الكمية المطلوبة - المهمة للتذكير فقط`
     : '';
 
 
@@ -49,13 +53,24 @@ const CreateTask = () => {
     api.get('/receivers').then(res => setReceivers(res.data)).catch(() => {});
   }, []);
 
+  // جلب عهدة العامل المختار عشان نظهر الكمية المتاحة معاه (للتذكير)
+  useEffect(() => {
+    if (form.worker_id && form.worker_id !== user.id) {
+      api.get(`/workers-load/${form.worker_id}`).then(res => {
+        setWorkerLoadProducts(res.data.load || []);
+      }).catch(() => setWorkerLoadProducts([]));
+    } else {
+      setWorkerLoadProducts([]);
+    }
+  }, [form.worker_id, user.id]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.worker_id) {
       return setMessage({ type: 'error', text: 'يرجى اختيار العامل' });
     }
-    if (quantityError) {
-      return setMessage({ type: 'error', text: quantityError });
+    if (quantityWarning) {
+      // مجرد تحذير مش مانع - المهمة للتذكير فقط
     }
     setLoading(true);
     try {
@@ -242,14 +257,14 @@ const CreateTask = () => {
             <input type="number" step={form.unit_type === 'weight' ? '0.001' : '1'} value={form.quantity} onChange={e => setForm({...form, quantity: e.target.value})} className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50" />
             {form.product_name && selectedProduct && (
               <div className="text-xs text-gray-500 mt-1">
-                المتاح في المخزون: <span className="font-bold">{fmt(availableQuantity)} {form.unit_type === 'weight' ? 'كجم' : 'قطعة'}</span>
+                المتاح {loadLabel}: <span className="font-bold">{fmt(availableQuantity)} {form.unit_type === 'weight' ? 'كجم' : 'قطعة'}</span>
               </div>
             )}
           </div>
         </div>
-        {quantityError && (
-          <div className="bg-red-50 text-red-700 p-3 rounded-xl text-sm border border-red-200">
-            ⚠️ {quantityError} - الكمية المطلوبة ({fmt(quantity)}) أكبر من المتاح
+        {quantityWarning && (
+          <div className="bg-yellow-50 text-yellow-800 p-3 rounded-xl text-sm border border-yellow-200">
+            {quantityWarning}
           </div>
         )}
 
